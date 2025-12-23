@@ -1,0 +1,57 @@
+{
+    "storeName": "Your Store Name",
+    "storeDescription": "Your e-commerce store powered by AI Sales Agent",
+    "currency": "BDT",
+    "ownerEmail": "",
+    "ai": {
+        "provider": "anthropic",
+        "apiKey": "",
+        "model": "claude-sonnet-4-20250514",
+        "maxDiscountPercent": 15
+    },
+    "payments": {
+        "cashOnDelivery": {
+            "enabled": true
+        },
+        "stripe": {
+            "enabled": false,
+            "publicKey": "",
+            "secretKey": ""
+        },
+        "paypal": {
+            "enabled": false,
+            "clientId": "",
+            "clientSecret": "",
+            "mode": "sandbox"
+        },
+        "bkash": {
+            "enabled": false,
+            "appKey": "",
+            "appSecret": "",
+            "username": "",
+            "password": "",
+            "mode": "sandbox"
+        }
+    },
+    "courier": {
+        "pathao": {
+            "enabled": false,
+            "clientId": "",
+            "clientSecret": "",
+            "username": "",
+            "password": ""
+        },
+        "steadfast": {
+            "enabled": false,
+            "apiKey": "",
+            "secretKey": ""
+        },
+        "manual": {
+            "enabled": true
+        }
+    },
+    "notifications": {
+        "emailNotifications": false,
+        "soundAlerts": true
+    }
+}
