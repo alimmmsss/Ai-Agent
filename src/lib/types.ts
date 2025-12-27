@@ -96,7 +96,7 @@ export interface Settings {
     ownerEmail: string;
 
     ai: {
-        provider: 'anthropic';
+        provider: 'anthropic' | 'google';
         apiKey: string;
         model: string;
         maxDiscountPercent: number;

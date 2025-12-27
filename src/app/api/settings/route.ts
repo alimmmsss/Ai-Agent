@@ -10,7 +10,7 @@ const defaultSettings: Settings = {
     currency: 'BDT',
     ownerEmail: '',
     ai: {
-        provider: 'anthropic',
+        provider: 'google',
         apiKey: '',
         model: 'claude-sonnet-4-20250514',
         maxDiscountPercent: 15,
