@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { processMessage, getFallbackResponse } from '@/lib/agent';
 import { createOrder, calculateDiscount, createApprovalRequest } from '@/lib/agent/tools';
 import type { ChatMessage, Product, Settings, Order } from '@/lib/types';
-import { db, products as productsTable } from '@/lib/db';
+import { db, products as productsTable, orders as ordersTable, orderItems as orderItemsTable } from '@/lib/db';
 
 // Default settings for AI
 const defaultSettings: Settings = {
@@ -96,10 +96,29 @@ export async function POST(request: NextRequest) {
                             discountPercent: discountPercent as number
                         }]);
 
-                        // Save order
-                        const ordersData = readJsonFile<{ orders: Order[] }>('orders.json');
-                        ordersData.orders.push(order);
-                        writeJsonFile('orders.json', ordersData);
+                        // Save order to database
+                        await db.insert(ordersTable).values({
+                            id: order.id,
+                            totalAmount: order.totalAmount,
+                            discountAmount: order.discountAmount,
+                            finalAmount: order.finalAmount,
+                            status: order.status,
+                            paymentStatus: order.paymentStatus,
+                        });
+
+                        // Save order items
+                        for (const item of order.items) {
+                            await db.insert(orderItemsTable).values({
+                                id: `${order.id}_item_${item.productId}`,
+                                orderId: order.id,
+                                productId: item.productId,
+                                productName: item.productName,
+                                quantity: item.quantity,
+                                originalPrice: item.originalPrice,
+                                finalPrice: item.finalPrice,
+                                discountPercent: item.discountPercent,
+                            });
+                        }
 
                         // Create approval request
                         const approval = createApprovalRequest(order, 'deal');
