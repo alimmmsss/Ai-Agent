@@ -33,10 +33,10 @@ export default async function DashboardLayout({
     }
 
     return (
-        <div className="min-h-screen bg-[#111827] flex">
+        <div className="min-h-screen bg-[#111827] lg:flex">
             <DashboardSidebar />
             {/* Main Content */}
-            <main className="flex-1 p-8 overflow-auto">
+            <main className="flex-1 p-4 pt-20 lg:pt-8 lg:p-8 overflow-auto">
                 {children}
             </main>
         </div>
