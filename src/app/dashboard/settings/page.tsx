@@ -141,16 +141,16 @@ export default function SettingsPage() {
 
                 {/* AI Settings */}
                 <section className="bg-[#1f2937] rounded-xl border border-gray-700 p-6">
-                    <h2 className="text-xl font-semibold text-white mb-4">🤖 AI Configuration (Claude)</h2>
+                    <h2 className="text-xl font-semibold text-white mb-4">🤖 AI Configuration (Google Gemini)</h2>
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm text-gray-400 mb-1">Anthropic API Key</label>
+                            <label className="block text-sm text-gray-400 mb-1">Google AI API Key</label>
                             <div className="relative">
                                 <input
                                     type={showKeys.ai ? 'text' : 'password'}
                                     value={settings.ai.apiKey}
                                     onChange={(e) => updateSettings('ai.apiKey', e.target.value)}
-                                    placeholder="sk-ant-..."
+                                    placeholder="AIza..."
                                     className="w-full px-4 py-2 pr-12 bg-[#374151] border border-gray-600 rounded-lg text-white"
                                 />
                                 <button
@@ -161,7 +161,19 @@ export default function SettingsPage() {
                                     {showKeys.ai ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">Get your API key from console.anthropic.com</p>
+                            <p className="text-xs text-gray-500 mt-1">Get your API key from aistudio.google.com</p>
+                        </div>
+                        <div>
+                            <label className="block text-sm text-gray-400 mb-1">Model</label>
+                            <select
+                                value={settings.ai.model}
+                                onChange={(e) => updateSettings('ai.model', e.target.value)}
+                                className="w-full px-4 py-2 bg-[#374151] border border-gray-600 rounded-lg text-white"
+                            >
+                                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast)</option>
+                                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Advanced)</option>
+                                <option value="gemini-2.0-flash">Gemini 2.0 Flash (Latest)</option>
+                            </select>
                         </div>
                         <div>
                             <label className="block text-sm text-gray-400 mb-1">Max Discount %</label>

@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSystemPrompt, getConversationContext } from './prompts';
 import { searchCatalog, formatProductCard, formatPrice } from './tools';
 import type { Product, ChatMessage, Settings, Order } from '../types';
@@ -25,37 +25,30 @@ export async function processMessage(
         };
     }
 
-    const client = new Anthropic({
-        apiKey: settings.ai.apiKey,
+    const genAI = new GoogleGenerativeAI(settings.ai.apiKey);
+    const model = genAI.getGenerativeModel({
+        model: settings.ai.model || 'gemini-1.5-flash',
+        systemInstruction: getSystemPrompt(settings, products)
     });
 
-    const systemPrompt = getSystemPrompt(settings, products);
-
-    // Build conversation for Claude
-    const messages = conversationHistory
+    // Build conversation history for Gemini
+    const history = conversationHistory
         .filter(msg => msg.role !== 'system')
         .map(msg => ({
-            role: msg.role as 'user' | 'assistant',
-            content: msg.content
+            role: msg.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: msg.content }]
         }));
 
-    // Add current message
-    messages.push({
-        role: 'user',
-        content: userMessage
-    });
-
     try {
-        const response = await client.messages.create({
-            model: settings.ai.model || 'claude-sonnet-4-20250514',
-            max_tokens: 1024,
-            system: systemPrompt,
-            messages: messages as Anthropic.MessageParam[]
+        const chat = model.startChat({
+            history: history as any,
+            generationConfig: {
+                maxOutputTokens: 1024,
+            },
         });
 
-        const assistantMessage = response.content[0].type === 'text'
-            ? response.content[0].text
-            : '';
+        const result = await chat.sendMessage(userMessage);
+        const assistantMessage = result.response.text();
 
         // Parse for system actions
         const action = parseSystemAction(assistantMessage);
@@ -141,3 +134,4 @@ export function getFallbackResponse(userMessage: string, products: Product[]): s
     // Default
     return "I'm here to help you find the perfect product! You can ask me about our products, prices, or place an order. What would you like to know?";
 }
+

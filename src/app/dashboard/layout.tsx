@@ -1,69 +1,40 @@
-'use client';
+import { currentUser } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
+import DashboardSidebar from './DashboardSidebar';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import {
-    LayoutDashboard,
-    ShoppingCart,
-    Package,
-    Bell,
-    Settings,
-    CheckCircle,
-    ArrowLeft
-} from 'lucide-react';
+const OWNER_EMAIL = process.env.OWNER_EMAIL || 'jc6815248@gmail.com';
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const pathname = usePathname();
+    // Server-side authentication check
+    const user = await currentUser();
 
-    const navItems = [
-        { href: '/dashboard', icon: LayoutDashboard, label: 'Overview' },
-        { href: '/dashboard/approvals', icon: Bell, label: 'Approvals' },
-        { href: '/dashboard/orders', icon: ShoppingCart, label: 'Orders' },
-        { href: '/dashboard/products', icon: Package, label: 'Products' },
-        { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
-    ];
+    // Check if user is authenticated
+    if (!user) {
+        redirect('/sign-in?redirect_url=/dashboard');
+    }
+
+    // Check if user is the owner
+    const userEmail = user.emailAddresses[0]?.emailAddress;
+
+    // Debug logging
+    console.log('Dashboard Auth Check:', {
+        userEmail,
+        ownerEmail: OWNER_EMAIL,
+        isOwner: userEmail === OWNER_EMAIL,
+    });
+
+    if (userEmail !== OWNER_EMAIL) {
+        console.log('Unauthorized access attempt - redirecting to home');
+        redirect('/?unauthorized=1');
+    }
 
     return (
         <div className="min-h-screen bg-[#111827] flex">
-            {/* Sidebar */}
-            <aside className="w-64 bg-[#1f2937] border-r border-gray-700 p-6 flex flex-col">
-                <div className="mb-8">
-                    <h1 className="text-xl font-bold text-white">Owner Dashboard</h1>
-                    <p className="text-slate-400 text-sm">AI Sales Agent</p>
-                </div>
-
-                <nav className="flex-1 space-y-2">
-                    {navItems.map((item) => {
-                        const isActive = pathname === item.href;
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'text-gray-400 hover:bg-[#374151] hover:text-white'
-                                    }`}
-                            >
-                                <item.icon size={20} />
-                                <span>{item.label}</span>
-                            </Link>
-                        );
-                    })}
-                </nav>
-
-                <Link
-                    href="/"
-                    className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white transition-colors mt-auto"
-                >
-                    <ArrowLeft size={20} />
-                    <span>Back to Store</span>
-                </Link>
-            </aside>
-
+            <DashboardSidebar />
             {/* Main Content */}
             <main className="flex-1 p-8 overflow-auto">
                 {children}
@@ -71,3 +42,4 @@ export default function DashboardLayout({
         </div>
     );
 }
+

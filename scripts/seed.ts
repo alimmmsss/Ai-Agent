@@ -1,0 +1,86 @@
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import * as dotenv from 'dotenv';
+import { products } from '../src/lib/db/schema';
+
+dotenv.config({ path: '.env.local' });
+
+const sql = neon(process.env.DATABASE_URL!);
+const db = drizzle(sql);
+
+const seedProducts = [
+    {
+        id: 'prod_001',
+        name: 'Premium Wireless Headphones',
+        description: 'High-quality wireless headphones with noise cancellation, 30-hour battery life, and premium sound quality.',
+        price: 4999,
+        currency: 'BDT',
+        stock: 25,
+        category: 'Electronics',
+        image: '/products/headphones.jpg',
+        maxDiscount: 15,
+    },
+    {
+        id: 'prod_002',
+        name: 'Smart Watch Pro',
+        description: 'Advanced smartwatch with health monitoring, GPS, and 7-day battery life. Water resistant up to 50m.',
+        price: 8999,
+        currency: 'BDT',
+        stock: 15,
+        category: 'Electronics',
+        image: '/products/smartwatch.jpg',
+        maxDiscount: 10,
+    },
+    {
+        id: 'prod_003',
+        name: 'Leather Messenger Bag',
+        description: 'Genuine leather messenger bag with laptop compartment. Perfect for professionals on the go.',
+        price: 3499,
+        currency: 'BDT',
+        stock: 30,
+        category: 'Fashion',
+        image: '/products/bag.jpg',
+        maxDiscount: 20,
+    },
+    {
+        id: 'prod_004',
+        name: 'Portable Power Bank 20000mAh',
+        description: 'Fast charging power bank with 20000mAh capacity. Charge your devices multiple times on the go.',
+        price: 1999,
+        currency: 'BDT',
+        stock: 50,
+        category: 'Electronics',
+        image: '/products/powerbank.jpg',
+        maxDiscount: 15,
+    },
+    {
+        id: 'prod_005',
+        name: 'Bluetooth Speaker',
+        description: 'Portable Bluetooth speaker with 360° sound, waterproof design, and 12-hour playback.',
+        price: 2499,
+        currency: 'BDT',
+        stock: 40,
+        category: 'Electronics',
+        image: '/products/speaker.jpg',
+        maxDiscount: 15,
+    },
+];
+
+async function seed() {
+    console.log('🌱 Seeding database...');
+
+    try {
+        // Insert products
+        for (const product of seedProducts) {
+            await db.insert(products).values(product).onConflictDoNothing();
+            console.log(`  ✓ Added product: ${product.name}`);
+        }
+
+        console.log('✅ Seeding completed!');
+    } catch (error) {
+        console.error('❌ Seeding failed:', error);
+        process.exit(1);
+    }
+}
+
+seed();

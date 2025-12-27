@@ -3,21 +3,36 @@ import { v4 as uuidv4 } from 'uuid';
 import { processMessage, getFallbackResponse } from '@/lib/agent';
 import { createOrder, calculateDiscount, createApprovalRequest } from '@/lib/agent/tools';
 import type { ChatMessage, Product, Settings, Order } from '@/lib/types';
-import fs from 'fs';
-import path from 'path';
+import { db, products as productsTable } from '@/lib/db';
 
-// Helper to read JSON files
-function readJsonFile<T>(filename: string): T {
-    const filePath = path.join(process.cwd(), 'src', 'data', filename);
-    const data = fs.readFileSync(filePath, 'utf-8');
-    return JSON.parse(data);
-}
-
-// Helper to write JSON files
-function writeJsonFile(filename: string, data: unknown): void {
-    const filePath = path.join(process.cwd(), 'src', 'data', filename);
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-}
+// Default settings for AI
+const defaultSettings: Settings = {
+    storeName: 'AI Store',
+    storeDescription: 'Your smart shopping destination',
+    currency: 'BDT',
+    ownerEmail: '',
+    ai: {
+        provider: 'google',
+        apiKey: process.env.GOOGLE_AI_API_KEY || '',
+        model: 'gemini-1.5-flash',
+        maxDiscountPercent: 15,
+    },
+    payments: {
+        cashOnDelivery: { enabled: true },
+        stripe: { enabled: false, publicKey: '', secretKey: '' },
+        paypal: { enabled: false, clientId: '', clientSecret: '', mode: 'sandbox' },
+        bkash: { enabled: false, appKey: '', appSecret: '', username: '', password: '', mode: 'sandbox' },
+    },
+    courier: {
+        pathao: { enabled: false, clientId: '', clientSecret: '', username: '', password: '' },
+        steadfast: { enabled: false, apiKey: '', secretKey: '' },
+        manual: { enabled: true },
+    },
+    notifications: {
+        emailNotifications: false,
+        soundAlerts: true,
+    },
+};
 
 export async function POST(request: NextRequest) {
     try {
@@ -28,10 +43,22 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Message is required' }, { status: 400 });
         }
 
-        // Load data
-        const settings = readJsonFile<Settings>('settings.json');
-        const productsData = readJsonFile<{ products: Product[] }>('products.json');
-        const products = productsData.products;
+        // Load products from database
+        let products: Product[] = [];
+        try {
+            products = await db.select().from(productsTable) as Product[];
+        } catch (error) {
+            console.error('Error fetching products:', error);
+        }
+
+        // Use default settings with env API key
+        const settings = {
+            ...defaultSettings,
+            ai: {
+                ...defaultSettings.ai,
+                apiKey: process.env.GOOGLE_AI_API_KEY || '',
+            }
+        };
 
         // Process message
         let response;

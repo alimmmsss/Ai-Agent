@@ -3,9 +3,17 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Package, MessageCircle, Info } from 'lucide-react';
+import { SignInButton, SignedIn, SignedOut, UserButton, useUser } from '@clerk/nextjs';
+
+const OWNER_EMAIL = 'jc6815248@gmail.com';
 
 export default function CustomerNav() {
     const pathname = usePathname();
+    const { user, isLoaded } = useUser();
+
+    const isOwner = user?.emailAddresses?.some(
+        (email) => email.emailAddress === OWNER_EMAIL
+    );
 
     const navItems = [
         { href: '/', label: 'Home', icon: Home },
@@ -34,8 +42,8 @@ export default function CustomerNav() {
                                 key={item.href}
                                 href={item.href}
                                 className={`flex items-center gap-2 text-sm font-medium transition-colors ${isActive
-                                        ? 'text-white'
-                                        : 'text-gray-400 hover:text-white'
+                                    ? 'text-white'
+                                    : 'text-gray-400 hover:text-white'
                                     }`}
                             >
                                 <item.icon size={16} />
@@ -45,12 +53,34 @@ export default function CustomerNav() {
                     })}
                 </nav>
 
-                <Link
-                    href="/dashboard"
-                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors text-sm"
-                >
-                    Owner Dashboard
-                </Link>
+                <div className="flex items-center gap-4">
+                    <SignedOut>
+                        <SignInButton mode="modal">
+                            <button className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors text-sm">
+                                Sign In
+                            </button>
+                        </SignInButton>
+                    </SignedOut>
+
+                    <SignedIn>
+                        {isLoaded && isOwner && (
+                            <Link
+                                href="/dashboard"
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-sm"
+                            >
+                                Owner Dashboard
+                            </Link>
+                        )}
+                        <UserButton
+                            afterSignOutUrl="/"
+                            appearance={{
+                                elements: {
+                                    avatarBox: "w-9 h-9",
+                                }
+                            }}
+                        />
+                    </SignedIn>
+                </div>
             </div>
 
             {/* Mobile Navigation */}
@@ -73,3 +103,4 @@ export default function CustomerNav() {
         </header>
     );
 }
+

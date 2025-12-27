@@ -1,24 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { Product } from '@/lib/types';
-import fs from 'fs';
-import path from 'path';
-
-function readJsonFile<T>(filename: string): T {
-    const filePath = path.join(process.cwd(), 'src', 'data', filename);
-    const data = fs.readFileSync(filePath, 'utf-8');
-    return JSON.parse(data);
-}
-
-function writeJsonFile(filename: string, data: unknown): void {
-    const filePath = path.join(process.cwd(), 'src', 'data', filename);
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-}
+import { db, products } from '@/lib/db';
+import { eq } from 'drizzle-orm';
+import { v4 as uuidv4 } from 'uuid';
 
 // GET all products
 export async function GET() {
     try {
-        const data = readJsonFile<{ products: Product[] }>('products.json');
-        return NextResponse.json(data.products);
+        const allProducts = await db.select().from(products);
+        return NextResponse.json(allProducts);
     } catch (error) {
         console.error('Error reading products:', error);
         return NextResponse.json([], { status: 200 });
@@ -28,18 +17,23 @@ export async function GET() {
 // POST - Add new product
 export async function POST(request: NextRequest) {
     try {
-        const product = await request.json();
-        const data = readJsonFile<{ products: Product[] }>('products.json');
+        const productData = await request.json();
 
-        // Generate ID if not provided
-        if (!product.id) {
-            product.id = `prod_${Date.now()}`;
-        }
+        const newProduct = {
+            id: productData.id || `prod_${uuidv4().slice(0, 8)}`,
+            name: productData.name,
+            description: productData.description,
+            price: productData.price,
+            currency: productData.currency || 'BDT',
+            stock: productData.stock || 0,
+            category: productData.category,
+            image: productData.image || '/products/default.jpg',
+            maxDiscount: productData.maxDiscount || 15,
+        };
 
-        data.products.push(product);
-        writeJsonFile('products.json', data);
+        await db.insert(products).values(newProduct);
 
-        return NextResponse.json(product, { status: 201 });
+        return NextResponse.json(newProduct, { status: 201 });
     } catch (error) {
         console.error('Error creating product:', error);
         return NextResponse.json({ error: 'Failed to create product' }, { status: 500 });
@@ -50,20 +44,18 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
     try {
         const { productId, updates } = await request.json();
-        const data = readJsonFile<{ products: Product[] }>('products.json');
 
-        const productIndex = data.products.findIndex(p => p.id === productId);
-        if (productIndex === -1) {
+        const result = await db
+            .update(products)
+            .set({ ...updates, updatedAt: new Date() })
+            .where(eq(products.id, productId))
+            .returning();
+
+        if (result.length === 0) {
             return NextResponse.json({ error: 'Product not found' }, { status: 404 });
         }
 
-        data.products[productIndex] = {
-            ...data.products[productIndex],
-            ...updates
-        };
-
-        writeJsonFile('products.json', data);
-        return NextResponse.json(data.products[productIndex]);
+        return NextResponse.json(result[0]);
     } catch (error) {
         console.error('Error updating product:', error);
         return NextResponse.json({ error: 'Failed to update product' }, { status: 500 });
@@ -80,9 +72,7 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'Product ID required' }, { status: 400 });
         }
 
-        const data = readJsonFile<{ products: Product[] }>('products.json');
-        data.products = data.products.filter(p => p.id !== productId);
-        writeJsonFile('products.json', data);
+        await db.delete(products).where(eq(products.id, productId));
 
         return NextResponse.json({ success: true });
     } catch (error) {
