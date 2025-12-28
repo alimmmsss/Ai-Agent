@@ -101,7 +101,7 @@ export default function ChatWidget() {
 
             {/* Chat Window */}
             {isOpen && (
-                <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden border border-gray-200">
+                <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 w-full sm:w-96 h-full sm:h-[600px] bg-white sm:rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden sm:border sm:border-gray-200">
                     {/* Header */}
                     <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -130,8 +130,8 @@ export default function ChatWidget() {
                             >
                                 <div
                                     className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user'
-                                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-md'
-                                            : 'bg-white text-gray-800 shadow-sm rounded-bl-md border border-gray-100'
+                                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-md'
+                                        : 'bg-white text-gray-800 shadow-sm rounded-bl-md border border-gray-100'
                                         }`}
                                 >
                                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>

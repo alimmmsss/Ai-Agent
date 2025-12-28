@@ -82,83 +82,83 @@ export default function ContactPage() {
         <main className="min-h-screen bg-[#111827]">
             <CustomerNav />
 
-            <section className="pt-32 pb-20 px-6">
+            <section className="pt-24 md:pt-32 pb-12 md:pb-20 px-4 md:px-6">
                 <div className="max-w-6xl mx-auto">
-                    <div className="text-center mb-12">
-                        <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                    <div className="text-center mb-8 md:mb-12">
+                        <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-3 md:mb-4">
                             Contact Us
                         </h1>
-                        <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+                        <p className="text-base md:text-xl text-gray-400 max-w-2xl mx-auto px-2">
                             Chat with our AI assistant for instant help, or use the contact information below.
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
                         {/* Chat Section */}
-                        <div className="lg:col-span-2 bg-[#1f2937] rounded-2xl border border-gray-700 overflow-hidden">
-                            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex items-center gap-3">
-                                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                                    <MessageCircle size={20} className="text-white" />
+                        <div className="lg:col-span-2 bg-[#1f2937] rounded-xl md:rounded-2xl border border-gray-700 overflow-hidden">
+                            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-3 md:p-4 flex items-center gap-3">
+                                <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <MessageCircle size={18} className="text-white" />
                                 </div>
-                                <div>
-                                    <h3 className="text-white font-semibold">AI Sales Assistant</h3>
-                                    <p className="text-white/70 text-sm">Online • Ready to help</p>
+                                <div className="min-w-0">
+                                    <h3 className="text-white font-semibold text-sm md:text-base">AI Sales Assistant</h3>
+                                    <p className="text-white/70 text-xs md:text-sm">Online • Ready to help</p>
                                 </div>
                             </div>
 
                             {/* Messages */}
-                            <div className="h-[400px] overflow-y-auto p-4 space-y-4">
+                            <div className="h-[300px] sm:h-[350px] md:h-[400px] overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
                                 {messages.map((msg) => (
                                     <div
                                         key={msg.id}
                                         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                     >
                                         <div
-                                            className={`max-w-[80%] p-4 rounded-2xl ${msg.role === 'user'
-                                                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-md'
-                                                    : 'bg-[#374151] text-white rounded-bl-md'
+                                            className={`max-w-[85%] sm:max-w-[80%] p-3 md:p-4 rounded-xl md:rounded-2xl ${msg.role === 'user'
+                                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-md'
+                                                : 'bg-[#374151] text-white rounded-bl-md'
                                                 }`}
                                         >
-                                            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                            <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">{msg.content}</p>
                                         </div>
                                     </div>
                                 ))}
                                 {isLoading && (
                                     <div className="flex justify-start">
-                                        <div className="bg-[#374151] p-4 rounded-2xl rounded-bl-md">
-                                            <Loader2 size={20} className="animate-spin text-indigo-400" />
+                                        <div className="bg-[#374151] p-3 md:p-4 rounded-xl md:rounded-2xl rounded-bl-md">
+                                            <Loader2 size={18} className="animate-spin text-indigo-400" />
                                         </div>
                                     </div>
                                 )}
                             </div>
 
                             {/* Input */}
-                            <div className="p-4 border-t border-gray-700">
-                                <div className="flex gap-3">
+                            <div className="p-3 md:p-4 border-t border-gray-700">
+                                <div className="flex gap-2 md:gap-3">
                                     <input
                                         type="text"
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyPress={handleKeyPress}
                                         placeholder="Type your message..."
-                                        className="flex-1 px-4 py-3 bg-[#374151] rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="flex-1 px-3 md:px-4 py-2.5 md:py-3 bg-[#374151] rounded-lg md:rounded-xl text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         disabled={isLoading}
                                     />
                                     <button
                                         onClick={sendMessage}
                                         disabled={isLoading || !input.trim()}
-                                        className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl text-white disabled:opacity-50 hover:shadow-lg transition-all"
+                                        className="px-4 md:px-6 py-2.5 md:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg md:rounded-xl text-white disabled:opacity-50 hover:shadow-lg transition-all flex-shrink-0"
                                     >
-                                        <Send size={20} />
+                                        <Send size={18} />
                                     </button>
                                 </div>
                             </div>
                         </div>
 
                         {/* Contact Info */}
-                        <div className="space-y-6">
-                            <div className="bg-[#1f2937] rounded-2xl border border-gray-700 p-6">
-                                <h3 className="text-lg font-semibold text-white mb-4">Quick Contact</h3>
+                        <div className="space-y-4 md:space-y-6">
+                            <div className="bg-[#1f2937] rounded-xl md:rounded-2xl border border-gray-700 p-4 md:p-6">
+                                <h3 className="text-base md:text-lg font-semibold text-white mb-3 md:mb-4">Quick Contact</h3>
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3 text-gray-400">
                                         <div className="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
