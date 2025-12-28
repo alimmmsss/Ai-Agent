@@ -52,9 +52,10 @@ export default async function Home() {
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
             {productList.map((product) => (
-              <div
+              <Link
                 key={product.id}
-                className="bg-white/5 backdrop-blur-sm rounded-xl md:rounded-2xl p-3 md:p-6 border border-white/10 hover:border-purple-500/50 transition-all duration-300 hover:scale-105"
+                href={`/products/${product.id}`}
+                className="bg-white/5 backdrop-blur-sm rounded-xl md:rounded-2xl p-3 md:p-6 border border-white/10 hover:border-purple-500/50 transition-all duration-300 hover:scale-105 block cursor-pointer"
               >
                 <div className="w-full h-32 md:h-48 bg-gradient-to-br from-indigo-600/20 to-purple-600/20 rounded-lg md:rounded-xl mb-3 md:mb-4 flex items-center justify-center overflow-hidden relative">
                   {product.image && product.image !== '/products/default.jpg' ? (
@@ -74,7 +75,7 @@ export default async function Home() {
                   <span className="text-lg md:text-2xl font-bold text-indigo-400">৳{product.price.toLocaleString()}</span>
                   <span className="text-[10px] md:text-sm text-gray-500 hidden sm:inline">{product.stock} in stock</span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
