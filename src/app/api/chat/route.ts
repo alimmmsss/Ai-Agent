@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI, FunctionCallingMode } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { v4 as uuidv4 } from 'uuid';
-import {
-    agentTools,
-    executeInventoryCheck,
-    executeCreateInvoice,
-    executeNegotiatePrice,
-    executeSavePreference,
-    getOrCreateSession,
-    saveSessionMessages
-} from '@/lib/agent/functions';
 import { db, products as productsTable } from '@/lib/db';
 
 interface ChatMessage {
@@ -18,165 +9,207 @@ interface ChatMessage {
     timestamp: string;
 }
 
-// System prompt for the AI agent
-const SYSTEM_PROMPT = `You are an AI Sales Assistant for an e-commerce store. Your job is to:
-
-1. **Help customers find products** - Use the inventory_check function to search and display products
-2. **Negotiate prices** - Use negotiate_price to offer discounts (max 15%). Be friendly but don't give discounts too easily
-3. **Create orders** - Use create_invoice when customer confirms purchase with their details
-4. **Remember preferences** - Use save_customer_preference to personalize the experience
-
-**Personality:**
-- Friendly, helpful, and professional
-- Enthusiastic about products but not pushy
-- Good at negotiating - start with lower discounts and work up if needed
-- Always confirm before creating orders
-
-**Rules:**
-- Maximum discount is 15%
-- Always check inventory before promising products
-- Get customer name, phone, address, and city before creating invoice
-- Use Bengali Taka (৳) for prices
-- Be conversational, not robotic
-
-**When customer asks about products:**
-Call inventory_check to get real product data, then describe them naturally.
-
-**When customer wants to negotiate:**
-Use negotiate_price with a reasonable counter-offer. Start at 5-10%, go up to 15% max if they push.
-
-**When customer wants to buy:**
-Collect: name, phone, address, city. Then call create_invoice.`;
+interface Product {
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    stock: number;
+    category: string;
+}
 
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { message, sessionId = 'default', conversationHistory = [] } = body;
+        const { message, conversationHistory = [] } = body;
 
         if (!message) {
             return NextResponse.json({ error: 'Message is required' }, { status: 400 });
         }
 
         const apiKey = process.env.GOOGLE_AI_API_KEY;
+
+        // Fetch products from database
+        let productList: Product[] = [];
+        try {
+            productList = await db.select().from(productsTable) as Product[];
+        } catch (error) {
+            console.error('Error fetching products:', error);
+        }
+
+        // If no API key, use fallback
         if (!apiKey) {
-            // Fallback response if no API key
             return NextResponse.json({
-                message: "Hello! I'm your AI shopping assistant. To enable full AI features, please configure your Google AI API key.",
-                sessionId
+                message: getFallbackResponse(message, productList),
+                messageId: uuidv4()
             });
         }
 
-        // Get or create session for persistent memory
-        const session = await getOrCreateSession(sessionId);
+        // Format product catalog for the AI
+        const productCatalog = productList.map(p =>
+            `• ${p.name} (ID: ${p.id}) - ৳${p.price.toLocaleString()} - ${p.stock > 0 ? `${p.stock} in stock` : 'Out of stock'} - Category: ${p.category}\n  Description: ${p.description}`
+        ).join('\n\n');
 
-        // Combine stored messages with current conversation
-        const allMessages: ChatMessage[] = [
-            ...session.messages,
-            ...conversationHistory.filter((m: ChatMessage) =>
-                !session.messages.some((sm: ChatMessage) => sm.content === m.content && sm.timestamp === m.timestamp)
-            )
-        ];
+        // Build comprehensive system prompt with actual product data
+        const systemPrompt = `You are a friendly and helpful AI Sales Assistant for "AI Store", an e-commerce store in Bangladesh.
+
+## YOUR PRODUCT CATALOG (REAL DATA - USE THIS):
+${productCatalog || 'No products currently available.'}
+
+## STORE INFORMATION:
+- Store Name: AI Store
+- Currency: Bengali Taka (৳ or BDT)
+- Location: Bangladesh
+- Payment Methods: Cash on Delivery (COD), bKash
+- Delivery: Nationwide delivery, typically 2-3 days
+
+## YOUR CAPABILITIES:
+1. **Product Information**: Answer questions about products using the catalog above
+2. **Price Negotiation**: You can offer up to 15% discount maximum
+3. **Order Assistance**: Help customers place orders
+4. **Recommendations**: Suggest products based on customer needs
+
+## HOW TO RESPOND:
+
+### When customer asks about products:
+- Reference specific products from the catalog above with accurate prices
+- Mention stock availability
+- Describe features from the product descriptions
+
+### When customer asks about a specific product:
+- Give detailed information about that exact product
+- Include price, stock status, and description
+- Suggest related products if relevant
+
+### When customer wants to buy:
+- Confirm which product and quantity
+- Ask for: Name, Phone, Address, City
+- Explain payment options (COD or bKash)
+
+### When customer negotiates price:
+- Start with 5% discount offer
+- Maximum you can offer is 15%
+- Be friendly but don't give max discount immediately
+
+## RULES:
+- Always use ৳ for prices (e.g., ৳4,999)
+- Be conversational and friendly, use emojis occasionally
+- Give accurate information from the product catalog
+- If product doesn't exist in catalog, say you don't have it
+- Keep responses concise but helpful
+- Remember what customer said earlier in conversation
+
+## EXAMPLE RESPONSES:
+
+Customer: "What products do you have?"
+You: "Welcome! 🛍️ Here are some of our popular products:
+
+• **Premium Wireless Headphones** - ৳4,999 (50 in stock)
+  High-quality sound with active noise cancellation
+
+• **Smart Watch Pro** - ৳8,999 (30 in stock)
+  Track fitness, receive notifications, monitor health
+
+Would you like details about any of these? 😊"
+
+Customer: "Tell me about the headphones"
+You: "Great choice! 🎧
+
+**Premium Wireless Headphones** - ৳4,999
+
+Features:
+- High-quality sound with deep bass
+- Active noise cancellation
+- Up to 30 hours battery life
+- Comfortable over-ear design
+
+We have 50 units in stock. Would you like to order one? I might be able to offer you a small discount! 😉"`;
 
         // Initialize Google AI
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
             model: 'gemini-1.5-flash',
-            systemInstruction: SYSTEM_PROMPT,
-            tools: agentTools,
+            systemInstruction: systemPrompt,
         });
 
-        // Build history for Gemini
-        const geminiHistory = allMessages
-            .filter(msg => msg.role !== 'system' as string)
-            .map(msg => ({
+        // Build conversation history for context
+        const history = conversationHistory
+            .filter((msg: ChatMessage) => msg.role === 'user' || msg.role === 'assistant')
+            .slice(-10) // Keep last 10 messages for context
+            .map((msg: ChatMessage) => ({
                 role: msg.role === 'assistant' ? 'model' : 'user',
                 parts: [{ text: msg.content }]
             }));
 
-        // Start chat with function calling enabled
+        // Start chat with history
         const chat = model.startChat({
-            history: geminiHistory as any,
+            history: history as any,
             generationConfig: {
                 maxOutputTokens: 1024,
+                temperature: 0.7,
             },
         });
 
-        // Send message
-        let result = await chat.sendMessage(message);
-        let response = result.response;
-
-        // Handle function calls
-        let functionCallCount = 0;
-        const maxFunctionCalls = 5;
-
-        while (response.functionCalls() && functionCallCount < maxFunctionCalls) {
-            functionCallCount++;
-            const functionCalls = response.functionCalls();
-            const functionResponses = [];
-
-            for (const call of functionCalls) {
-                console.log(`Calling function: ${call.name}`, call.args);
-
-                let functionResult: string;
-
-                switch (call.name) {
-                    case 'inventory_check':
-                        functionResult = await executeInventoryCheck(call.args as any);
-                        break;
-                    case 'create_invoice':
-                        functionResult = await executeCreateInvoice(call.args as any);
-                        break;
-                    case 'negotiate_price':
-                        functionResult = await executeNegotiatePrice(call.args as any, sessionId);
-                        break;
-                    case 'save_customer_preference':
-                        functionResult = await executeSavePreference(call.args as any, sessionId);
-                        break;
-                    default:
-                        functionResult = JSON.stringify({ error: 'Unknown function' });
-                }
-
-                functionResponses.push({
-                    functionResponse: {
-                        name: call.name,
-                        response: JSON.parse(functionResult)
-                    }
-                });
-            }
-
-            // Send function results back to the model
-            result = await chat.sendMessage(functionResponses as any);
-            response = result.response;
-        }
-
-        // Get final text response
-        const assistantMessage = response.text();
-
-        // Save messages to session
-        const updatedMessages: ChatMessage[] = [
-            ...allMessages,
-            { role: 'user', content: message, timestamp: new Date().toISOString() },
-            { role: 'assistant', content: assistantMessage, timestamp: new Date().toISOString() }
-        ];
-
-        // Keep only last 20 messages to prevent token overflow
-        const messagesToSave = updatedMessages.slice(-20);
-        await saveSessionMessages(sessionId, messagesToSave);
+        // Send message and get response
+        const result = await chat.sendMessage(message);
+        const assistantMessage = result.response.text();
 
         return NextResponse.json({
             message: assistantMessage,
-            sessionId,
             messageId: uuidv4()
         });
 
     } catch (error) {
         console.error('Chat API Error:', error);
-        return NextResponse.json(
-            {
-                error: 'Failed to process message',
-                message: "I apologize, I'm having a moment. Could you please try again?"
-            },
-            { status: 500 }
-        );
+        return NextResponse.json({
+            message: "I apologize, I'm having a moment. Could you please try again? 🙏",
+            messageId: uuidv4()
+        });
     }
+}
+
+// Fallback responses when API key is not configured
+function getFallbackResponse(message: string, products: Product[]): string {
+    const lower = message.toLowerCase();
+
+    // Greeting
+    if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey') || lower.match(/^(hi|hello|hey)$/)) {
+        return "Hello! 👋 Welcome to AI Store! I'm your shopping assistant. How can I help you today? Feel free to ask about our products!";
+    }
+
+    // Products inquiry
+    if (lower.includes('product') || lower.includes('what do you have') || lower.includes('show') || lower.includes('catalog')) {
+        if (products.length === 0) {
+            return "We're currently updating our catalog. Please check back soon!";
+        }
+        const list = products.slice(0, 3).map(p =>
+            `• **${p.name}** - ৳${p.price.toLocaleString()} (${p.stock > 0 ? 'In stock' : 'Out of stock'})`
+        ).join('\n');
+        return `Here are some of our products:\n\n${list}\n\nWould you like more details about any of these?`;
+    }
+
+    // Price inquiry
+    if (lower.includes('price') || lower.includes('cost') || lower.includes('how much')) {
+        const matchedProduct = products.find(p =>
+            lower.includes(p.name.toLowerCase()) ||
+            lower.includes(p.category.toLowerCase())
+        );
+        if (matchedProduct) {
+            return `**${matchedProduct.name}** is priced at ৳${matchedProduct.price.toLocaleString()}. Would you like to purchase it?`;
+        }
+        return "Which product's price would you like to know? I can help you find the best deals!";
+    }
+
+    // Buy intent
+    if (lower.includes('buy') || lower.includes('order') || lower.includes('purchase')) {
+        return "Great! 🛒 To place an order, please tell me:\n1. Which product you'd like\n2. Your name and phone number\n3. Delivery address\n\nI'll help you complete your purchase!";
+    }
+
+    // Thanks
+    if (lower.includes('thank')) {
+        return "You're welcome! 😊 Is there anything else I can help you with?";
+    }
+
+    // Default
+    return "I'm here to help! You can ask me about:\n• Our products and prices\n• Stock availability\n• Placing an order\n• Special discounts\n\nWhat would you like to know?";
 }
