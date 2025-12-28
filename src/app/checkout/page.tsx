@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import CustomerNav from '@/components/CustomerNav';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -16,7 +16,7 @@ interface Product {
     image?: string | null;
 }
 
-export default function CheckoutPage() {
+function CheckoutContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const productId = searchParams.get('product');
@@ -426,5 +426,17 @@ export default function CheckoutPage() {
                 </div>
             </section>
         </main>
+    );
+}
+
+export default function CheckoutPage() {
+    return (
+        <Suspense fallback={
+            <main className="min-h-screen bg-[#111827] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+            </main>
+        }>
+            <CheckoutContent />
+        </Suspense>
     );
 }

@@ -1,7 +1,7 @@
 import { db, products, orders, orderItems, customerInfo, chatSessions } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
-import type { FunctionDeclaration, Tool } from '@google/generative-ai';
+import { SchemaType, type FunctionDeclaration, type Tool } from '@google/generative-ai';
 
 // ============================================
 // FUNCTION CALLING SCHEMAS FOR GOOGLE AI
@@ -14,18 +14,18 @@ export const inventoryCheckDeclaration: FunctionDeclaration = {
     name: 'inventory_check',
     description: 'Check product inventory, get product details, search for products by name or category. Use this when a customer asks about products, prices, availability, or wants to browse the catalog.',
     parameters: {
-        type: 'object',
+        type: SchemaType.OBJECT,
         properties: {
             query: {
-                type: 'string',
+                type: SchemaType.STRING,
                 description: 'Search query for product name, category, or keywords (e.g., "headphones", "electronics", "smart watch")'
             },
             productId: {
-                type: 'string',
+                type: SchemaType.STRING,
                 description: 'Specific product ID to check (e.g., "prod_001")'
             },
             checkStock: {
-                type: 'boolean',
+                type: SchemaType.BOOLEAN,
                 description: 'Whether to check stock availability'
             }
         },
@@ -40,40 +40,39 @@ export const createInvoiceDeclaration: FunctionDeclaration = {
     name: 'create_invoice',
     description: 'Create an invoice/order when a customer confirms they want to purchase a product. Use this after customer confirms purchase intent and provides required information.',
     parameters: {
-        type: 'object',
+        type: SchemaType.OBJECT,
         properties: {
             productId: {
-                type: 'string',
+                type: SchemaType.STRING,
                 description: 'The ID of the product to order'
             },
             quantity: {
-                type: 'number',
+                type: SchemaType.NUMBER,
                 description: 'Number of items to order (default: 1)'
             },
             discountPercent: {
-                type: 'number',
+                type: SchemaType.NUMBER,
                 description: 'Discount percentage to apply (0-15 max)'
             },
             customerName: {
-                type: 'string',
+                type: SchemaType.STRING,
                 description: 'Customer full name'
             },
             customerPhone: {
-                type: 'string',
+                type: SchemaType.STRING,
                 description: 'Customer phone number'
             },
             customerAddress: {
-                type: 'string',
+                type: SchemaType.STRING,
                 description: 'Delivery address'
             },
             customerCity: {
-                type: 'string',
+                type: SchemaType.STRING,
                 description: 'City for delivery'
             },
             paymentMethod: {
-                type: 'string',
-                enum: ['cod', 'bkash', 'online'],
-                description: 'Payment method (cod = Cash on Delivery)'
+                type: SchemaType.STRING,
+                description: 'Payment method (cod = Cash on Delivery, bkash, or online)'
             }
         },
         required: ['productId', 'customerName', 'customerPhone', 'customerAddress', 'customerCity']
@@ -87,22 +86,22 @@ export const negotiatePriceDeclaration: FunctionDeclaration = {
     name: 'negotiate_price',
     description: 'Negotiate price with the customer. Use when customer asks for discount, bargains, or tries to negotiate. You can offer up to 15% discount max.',
     parameters: {
-        type: 'object',
+        type: SchemaType.OBJECT,
         properties: {
             productId: {
-                type: 'string',
+                type: SchemaType.STRING,
                 description: 'The product ID to negotiate price for'
             },
             requestedDiscount: {
-                type: 'number',
+                type: SchemaType.NUMBER,
                 description: 'Discount percentage the customer is requesting'
             },
             counterOffer: {
-                type: 'number',
+                type: SchemaType.NUMBER,
                 description: 'Your counter-offer discount percentage (max 15%)'
             },
             reason: {
-                type: 'string',
+                type: SchemaType.STRING,
                 description: 'Reason for the discount decision'
             }
         },
@@ -117,15 +116,14 @@ export const savePreferenceDeclaration: FunctionDeclaration = {
     name: 'save_customer_preference',
     description: 'Save customer preferences like favorite categories, price range, or specific interests for personalized recommendations.',
     parameters: {
-        type: 'object',
+        type: SchemaType.OBJECT,
         properties: {
             preferenceType: {
-                type: 'string',
-                enum: ['category', 'price_range', 'brand', 'interest'],
-                description: 'Type of preference to save'
+                type: SchemaType.STRING,
+                description: 'Type of preference to save (category, price_range, brand, interest)'
             },
             value: {
-                type: 'string',
+                type: SchemaType.STRING,
                 description: 'The preference value (e.g., "electronics", "budget-friendly")'
             }
         },
