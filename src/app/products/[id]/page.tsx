@@ -85,25 +85,31 @@ export default async function ProductDetailPage({ params }: PageProps) {
                                     ৳{product.price.toLocaleString()}
                                 </span>
                                 <span className={`px-3 py-1 rounded-full text-sm ${product.stock > 10
-                                        ? 'bg-green-500/20 text-green-400'
-                                        : product.stock > 0
-                                            ? 'bg-yellow-500/20 text-yellow-400'
-                                            : 'bg-red-500/20 text-red-400'
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : product.stock > 0
+                                        ? 'bg-yellow-500/20 text-yellow-400'
+                                        : 'bg-red-500/20 text-red-400'
                                     }`}>
                                     {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
                                 </span>
                             </div>
 
                             {/* Buy Actions */}
-                            <div className="space-y-4 mb-8">
+                            <div className="space-y-3 mb-8">
+                                <Link
+                                    href={`/checkout?product=${product.id}`}
+                                    className="w-full block text-center px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold text-lg hover:shadow-2xl hover:shadow-green-500/25 transition-all duration-300"
+                                >
+                                    🛒 Buy Now
+                                </Link>
                                 <Link
                                     href={`/contact?product=${encodeURIComponent(product.name)}`}
                                     className="w-full block text-center px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold text-lg hover:shadow-2xl hover:shadow-purple-500/25 transition-all duration-300"
                                 >
-                                    💬 Chat to Buy
+                                    💬 Chat to Buy (Get Discounts!)
                                 </Link>
                                 <p className="text-gray-500 text-sm text-center">
-                                    Our AI sales assistant will help you complete your purchase and may offer special discounts!
+                                    Chat with our AI for special discounts or buy directly above
                                 </p>
                             </div>
 
