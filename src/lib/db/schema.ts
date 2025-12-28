@@ -76,6 +76,18 @@ export const subscribers = pgTable('subscribers', {
     unsubscribedAt: timestamp('unsubscribed_at'),
 });
 
+// Chat Sessions table for persistent chat history
+export const chatSessions = pgTable('chat_sessions', {
+    id: text('id').primaryKey(),
+    sessionId: text('session_id').notNull(), // Browser session or user identifier
+    messages: json('messages').notNull().default([]), // Array of chat messages
+    customerPreferences: json('customer_preferences').default({}), // Remembered preferences
+    lastProductViewed: text('last_product_viewed'),
+    negotiatedDiscounts: json('negotiated_discounts').default({}), // Product-specific discounts
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // Types for Drizzle
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
@@ -87,4 +99,6 @@ export type CustomerInfo = typeof customerInfo.$inferSelect;
 export type NewCustomerInfo = typeof customerInfo.$inferInsert;
 export type Subscriber = typeof subscribers.$inferSelect;
 export type NewSubscriber = typeof subscribers.$inferInsert;
+export type ChatSession = typeof chatSessions.$inferSelect;
+export type NewChatSession = typeof chatSessions.$inferInsert;
 
