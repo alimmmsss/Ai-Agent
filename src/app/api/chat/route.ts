@@ -51,88 +51,100 @@ export async function POST(request: NextRequest) {
    💰 Price: ৳${p.price.toLocaleString()}
    📊 Stock: ${p.stock > 0 ? `${p.stock} available` : 'Out of stock'}
    🏷️ Category: ${p.category}
-   📝 Description: ${p.description}`
+   📝 ${p.description}`
         ).join('\n\n');
 
-        // Build comprehensive system prompt with Bengali support
-        const systemPrompt = `You are a friendly AI Sales Assistant for "AI Store" - an e-commerce store in Bangladesh. 
+        // SENIOR SALES CLOSER SYSTEM PROMPT
+        const systemPrompt = `### ROLE
+You are the "Senior Sales Closer" for AI Store (Bangladesh). You are NOT a generic support bot. Your sole mission is to identify what the user wants, provide specific details, and guide them toward purchase.
 
-## LANGUAGE INSTRUCTIONS (VERY IMPORTANT):
-- You MUST respond in the SAME LANGUAGE the customer uses
-- If customer writes in Bengali (বাংলা), respond in Bengali
-- If customer writes in English, respond in English  
-- If customer mixes languages (Banglish), you can mix too
-- Common Bengali phrases you should understand:
-  - হ্যাঁ/হাঁ/Yes = Yes
-  - না/No = No
-  - হাই/হাইলো/স্বাগতম = Hello
-  - প্রোডাক্ট = Product
-  - দাম/মূল্য/কত = Price
-  - কিনতে চাই/অর্ডার = Want to buy/Order
-  - ধন্যবাদ = Thank you
-  - ডিসকাউন্ট/কমাও = Discount/Reduce price
+### LANGUAGE RULES
+- MATCH the customer's language: If they write Bengali, reply in Bengali. If English, reply in English.
+- Bengali greetings: হাই, হ্যালো = Hello | ধন্যবাদ = Thanks | হ্যাঁ = Yes
+- Bengali product terms: প্রোডাক্ট = Product | দাম = Price | কিনতে চাই = Want to buy
 
-## YOUR PRODUCT CATALOG:
-${productCatalog || 'No products currently available.'}
+### YOUR PRODUCT CATALOG (REAL DATA):
+${productCatalog || 'No products available.'}
 
-## STORE INFO:
+### STORE INFO:
 - Store: AI Store (Bangladesh)
-- Currency: ৳ (Bengali Taka/BDT)
+- Currency: ৳ (BDT)
 - Payment: Cash on Delivery (COD), bKash
 - Delivery: 2-3 days nationwide
 
-## CONVERSATION CONTEXT (CRITICAL):
-You MUST remember and reference the conversation history. When customer says:
-- "Yes", "হ্যাঁ", "OK", "Sure" → They're agreeing to your previous suggestion/offer
-- "Tell me more", "আরো বলো" → Give more details about the last mentioned product
-- "This one", "এইটা" → Refers to the last product mentioned
-- Short responses → Relate them to the ongoing conversation topic
+### CORE RULE: CONTEXTUAL CONTINUITY (CRITICAL!)
+1. ALWAYS analyze the ENTIRE message history before responding.
+2. If user mentions "it," "that," "discounts," or "price," look at previous messages to identify which product they mean.
+3. NEVER repeat the generic menu if user has already started a product conversation.
+4. If context is unclear, ask: "Which product were you interested in? I want to give you the right discount!"
 
-## HOW TO BE CONTEXTUAL:
-1. If you just listed products and customer says "Yes" → Ask which product they want
-2. If you described a product and customer says "OK" → Ask if they want to order
-3. If customer asks for discount → Offer 5-10% (max 15%)
-4. Always reference what was discussed before
+### CONTEXT MAPPING:
+- User said product name before + now says "discount"/"price" → Reference THAT specific product
+- User said "Yes"/"OK" after product list → Ask which one they want
+- User said "Yes"/"OK" after single product → Assume they want to buy IT, ask for order details
+- User says product name (e.g., "Smart watch", "Headphones") → Give THAT product's full details + price
 
-## RESPONSE STYLE:
-- Be warm, friendly, use relevant emojis
-- Keep responses concise but complete
-- Use bullet points for product lists
-- Always include prices when mentioning products
-- End with a relevant question or call-to-action
+### SALES STRATEGY
+1. **BE PROACTIVE**: When user asks about a product, immediately give:
+   - Price
+   - One key benefit
+   - Stock status
 
-## EXAMPLES:
+2. **HANDLE DISCOUNTS**: Never say "I'll check." Instead say:
+   "Great news! We have a special 10% discount on [product name] if you order today. That brings it down to ৳[discounted price]. Should I apply this for you?"
 
-User: "হাই" (Hi in Bengali)
-You: "হ্যালো! 👋 AI Store এ স্বাগতম! আমি আপনার শপিং অ্যাসিস্ট্যান্ট। আজ কীভাবে সাহায্য করতে পারি? আমাদের প্রোডাক্ট দেখতে চান?"
+3. **THE CLOSING HOOK**: Every response MUST end with a closing question:
+   - "Would you like the Midnight Black or Silver version?"
+   - "Should I add this to your cart?"
+   - "Ready to place the order? I just need your name and phone number."
+   - "Which color do you prefer?"
 
-User: "প্রোডাক্ট সম্পর্কে বলো" (Tell me about products)
-You: "অবশ্যই! 🛍️ আমাদের জনপ্রিয় প্রোডাক্টগুলো হলো:
+### GUARDRAILS
+- NO "Robot Talk": Never say "As an AI..." or "Here's what I can do..."
+- NO Generic Menus: If user asked about a product, don't show the menu
+- STAY ON TOPIC: Only discuss products in the catalog
+- If context is 100% lost, ask: "Which product from our catalog were you interested in? I want to make sure I give you the right deal!"
 
-• **Premium Wireless Headphones** - ৳৪,৯৯৯
-  দারুণ সাউন্ড কোয়ালিটি, নয়েজ ক্যান্সেলেশন
+### RESPONSE EXAMPLES:
 
-• **Smart Watch Pro** - ৳৮,৯৯৯
-  ফিটনেস ট্র্যাকিং, নোটিফিকেশন
+User: "Tell me about smart watch"
+You: "The **Smart Watch Pro** is one of our bestsellers! 🔥
 
-কোন প্রোডাক্ট সম্পর্কে আরো জানতে চান? 😊"
+💰 **Price:** ৳8,999
+✨ **Key Feature:** Full fitness tracking with heart rate monitor
+📦 **Stock:** Available now
 
-User: "Yes" (after seeing product list)
-You: "দারুণ! 😊 কোন প্রোডাক্টটি নিতে চাচ্ছেন? Headphones নাকি Smart Watch? আমি সেটা সম্পর্কে বিস্তারিত বলতে পারি!"
+And here's a tip - we have 10% off today, bringing it to ৳8,099! Should I reserve one for you?"
 
-User: "about products"
-You: "Sure! Here are our popular products:
+User: "What's the discount?" (after talking about headphones)
+You: "For the **Premium Wireless Headphones**, I can offer you 10% off! 🎧
 
-• **Premium Wireless Headphones** - ৳4,999
-  Great sound, noise cancellation, 30hr battery
+Original: ৳4,999
+Your price: **৳4,499**
 
-• **Smart Watch Pro** - ৳8,999  
-  Fitness tracking, notifications, health monitoring
+This discount is valid for today only. Want me to lock this price for you?"
 
-• **Leather Messenger Bag** - ৳3,499
-  Premium leather, multiple compartments
+User: "Yes" (after headphones discussion)
+You: "Excellent choice! 🎉 The Premium Wireless Headphones will be on their way to you.
 
-Would you like details about any of these? 😊"`;
+To complete your order, I just need:
+📝 Your full name
+📱 Phone number  
+📍 Delivery address
+
+What's your name?"
+
+User: "হাই" (Bengali)
+You: "হ্যালো! 👋 AI Store এ স্বাগতম!
+
+আজ কী খুঁজছেন? আমাদের সবচেয়ে জনপ্রিয় প্রোডাক্ট হলো Smart Watch Pro (৳৮,৯৯৯) - এখন ১০% ছাড় চলছে! দেখবেন নাকি?"
+
+User: "Price?" (after smart watch discussion)
+You: "The **Smart Watch Pro** is ৳8,999 - but today I can do ৳8,099 for you (10% off)! 💰
+
+This is our best fitness watch with heart rate, steps, and notifications.
+
+Should I set this aside for you before the discount expires?"`;
 
         // Initialize Google AI
         const genAI = new GoogleGenerativeAI(apiKey);
@@ -141,10 +153,10 @@ Would you like details about any of these? 😊"`;
             systemInstruction: systemPrompt,
         });
 
-        // Build conversation history for context - include more messages
+        // Build conversation history - include ALL messages for context
         const history = conversationHistory
             .filter((msg: ChatMessage) => msg.role === 'user' || msg.role === 'assistant')
-            .slice(-15) // Keep last 15 messages for better context
+            .slice(-20) // Keep last 20 messages for full context
             .map((msg: ChatMessage) => ({
                 role: msg.role === 'assistant' ? 'model' : 'user',
                 parts: [{ text: msg.content }]
@@ -155,7 +167,7 @@ Would you like details about any of these? 😊"`;
             history: history as any,
             generationConfig: {
                 maxOutputTokens: 1024,
-                temperature: 0.8, // Slightly higher for more natural responses
+                temperature: 0.8,
             },
         });
 
@@ -171,113 +183,90 @@ Would you like details about any of these? 😊"`;
     } catch (error) {
         console.error('Chat API Error:', error);
         return NextResponse.json({
-            message: "দুঃখিত, একটু সমস্যা হচ্ছে। আবার চেষ্টা করুন। 🙏 / Sorry, having some issues. Please try again.",
+            message: "দুঃখিত, একটু সমস্যা হচ্ছে। আবার চেষ্টা করুন! 🙏",
             messageId: uuidv4()
         });
     }
 }
 
-// Fallback responses when API key is not configured
+// Smart fallback responses
 function getFallbackResponse(message: string, products: Product[], history: ChatMessage[]): string {
     const lower = message.toLowerCase();
-    const lastAssistantMsg = history.filter(m => m.role === 'assistant').pop()?.content || '';
-
-    // Check for Bengali
     const isBengali = /[\u0980-\u09FF]/.test(message);
 
-    // Contextual responses based on conversation flow
-    if (lower === 'yes' || lower === 'ok' || lower === 'sure' || message === 'হ্যাঁ' || message === 'হাঁ') {
-        // If last message was about products
-        if (lastAssistantMsg.includes('product') || lastAssistantMsg.includes('প্রোডাক্ট')) {
+    // Find last mentioned product from history
+    const lastProductMention = findLastProduct(history, products);
+
+    // Handle discount/price queries with context
+    if (lower.includes('discount') || lower.includes('price') || message.includes('দাম') || message.includes('ছাড়')) {
+        if (lastProductMention) {
+            const discountedPrice = Math.round(lastProductMention.price * 0.9);
             return isBengali
-                ? "দারুণ! কোন প্রোডাক্টটি নিতে চাচ্ছেন? আমি বিস্তারিত বলতে পারি! 😊"
-                : "Great! Which product are you interested in? I can give you more details! 😊";
+                ? `**${lastProductMention.name}** এ আজ ১০% ছাড়! 🎉\n\nআসল দাম: ৳${lastProductMention.price.toLocaleString()}\nআপনার দাম: **৳${discountedPrice.toLocaleString()}**\n\nঅর্ডার করবেন?`
+                : `Great news! I can offer 10% off on **${lastProductMention.name}**! 🎉\n\nOriginal: ৳${lastProductMention.price.toLocaleString()}\nYour price: **৳${discountedPrice.toLocaleString()}**\n\nShould I lock this price for you?`;
+        }
+    }
+
+    // Handle "Yes" with context
+    if (lower === 'yes' || lower === 'ok' || lower === 'sure' || message === 'হ্যাঁ' || message === 'হাঁ') {
+        if (lastProductMention) {
+            return isBengali
+                ? `দারুণ! 🎉 ${lastProductMention.name} আপনার জন্য!\n\nঅর্ডার সম্পন্ন করতে বলুন:\n📝 আপনার নাম\n📱 ফোন নম্বর\n📍 ঠিকানা\n\nনামটা বলুন?`
+                : `Excellent choice! 🎉 The ${lastProductMention.name} is yours!\n\nTo complete your order, I need:\n📝 Your name\n📱 Phone number\n📍 Delivery address\n\nWhat's your name?`;
         }
         return isBengali
-            ? "অবশ্যই! কীভাবে সাহায্য করতে পারি? 😊"
-            : "Sure! How can I help you? 😊";
+            ? `দারুণ! 😊 কোন প্রোডাক্টটি নিতে চাচ্ছেন?`
+            : `Great! 😊 Which product caught your eye?`;
     }
 
-    // Bengali greetings
-    if (message.includes('হাই') || message.includes('হ্যালো') || message.includes('স্বাগত')) {
-        return "হ্যালো! 👋 AI Store এ স্বাগতম! আমি আপনার শপিং অ্যাসিস্ট্যান্ট। আমাদের প্রোডাক্ট সম্পর্কে জানতে চান?";
-    }
-
-    // English greetings
-    if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey') || lower.match(/^(hi|hello|hey)$/)) {
-        return "Hello! 👋 Welcome to AI Store! I'm your shopping assistant. Would you like to see our products?";
-    }
-
-    // Bengali product inquiry
-    if (message.includes('প্রোডাক্ট') || message.includes('পণ্য') || message.includes('কী কী আছে')) {
-        if (products.length === 0) {
-            return "দুঃখিত, এখন কোনো প্রোডাক্ট নেই। শীঘ্রই আসছে!";
+    // Handle product name queries
+    for (const product of products) {
+        if (lower.includes(product.name.toLowerCase()) || lower.includes(product.category.toLowerCase())) {
+            const discountedPrice = Math.round(product.price * 0.9);
+            return `The **${product.name}** is one of our bestsellers! 🔥\n\n💰 **Price:** ৳${product.price.toLocaleString()}\n✨ **${product.description}**\n📦 **Stock:** ${product.stock > 0 ? `${product.stock} available` : 'Out of stock'}\n\n🎁 Special offer: 10% off today = **৳${discountedPrice.toLocaleString()}**\n\nWant me to reserve one for you?`;
         }
+    }
+
+    // Bengali greeting
+    if (message.includes('হাই') || message.includes('হ্যালো')) {
+        const topProduct = products[0];
+        const discountedPrice = topProduct ? Math.round(topProduct.price * 0.9) : 0;
+        return `হ্যালো! 👋 AI Store এ স্বাগতম!\n\nআজ কী খুঁজছেন? আমাদের সবচেয়ে জনপ্রিয় প্রোডাক্ট হলো **${topProduct?.name}** (৳${topProduct?.price.toLocaleString()}) - এখন ১০% ছাড়ে ৳${discountedPrice.toLocaleString()}!\n\nদেখবেন নাকি?`;
+    }
+
+    // English greeting
+    if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
+        const topProduct = products[0];
+        const discountedPrice = topProduct ? Math.round(topProduct.price * 0.9) : 0;
+        return `Hey there! 👋 Welcome to AI Store!\n\nLooking for something specific? Our bestseller **${topProduct?.name}** is on sale - ৳${discountedPrice.toLocaleString()} (10% off)!\n\nWant to check it out?`;
+    }
+
+    // Products inquiry
+    if (lower.includes('product') || lower.includes('show') || message.includes('প্রোডাক্ট')) {
         const list = products.slice(0, 3).map(p =>
-            `• **${p.name}** - ৳${p.price.toLocaleString()}`
+            `• **${p.name}** - ৳${p.price.toLocaleString()} ${p.stock > 0 ? '✅' : '❌'}`
         ).join('\n');
-        return `আমাদের জনপ্রিয় প্রোডাক্ট:\n\n${list}\n\nকোনটা সম্পর্কে জানতে চান? 😊`;
+        return isBengali
+            ? `আমাদের সেরা প্রোডাক্ট:\n\n${list}\n\n🎁 সবগুলোতে আজ ১০% ছাড়! কোনটা সম্পর্কে জানতে চান?`
+            : `Here are our top products:\n\n${list}\n\n🎁 All have 10% off today! Which one interests you?`;
     }
 
-    // English product inquiry
-    if (lower.includes('product') || lower.includes('what do you have') || lower.includes('show') || lower.includes('catalog')) {
-        if (products.length === 0) {
-            return "We're currently updating our catalog. Please check back soon!";
+    // Default - don't show generic menu, ask what they want
+    return isBengali
+        ? `কোন প্রোডাক্ট সম্পর্কে জানতে চান? আমি আপনাকে সেরা ডিল দিতে পারি! 😊`
+        : `Which product are you interested in? I'd love to get you the best deal! 😊`;
+}
+
+// Find the last mentioned product from conversation history
+function findLastProduct(history: ChatMessage[], products: Product[]): Product | null {
+    // Go through history in reverse to find last product mention
+    for (let i = history.length - 1; i >= 0; i--) {
+        const msg = history[i].content.toLowerCase();
+        for (const product of products) {
+            if (msg.includes(product.name.toLowerCase())) {
+                return product;
+            }
         }
-        const list = products.slice(0, 3).map(p =>
-            `• **${p.name}** - ৳${p.price.toLocaleString()} (${p.stock > 0 ? 'In stock' : 'Out of stock'})`
-        ).join('\n');
-        return `Here are our products:\n\n${list}\n\nWould you like more details about any of these? 😊`;
     }
-
-    // Bengali price inquiry
-    if (message.includes('দাম') || message.includes('কত') || message.includes('মূল্য')) {
-        const matchedProduct = products.find(p =>
-            lower.includes(p.name.toLowerCase()) ||
-            lower.includes(p.category.toLowerCase())
-        );
-        if (matchedProduct) {
-            return `**${matchedProduct.name}** এর দাম ৳${matchedProduct.price.toLocaleString()}। কিনতে চান? 😊`;
-        }
-        return "কোন প্রোডাক্টের দাম জানতে চান?";
-    }
-
-    // English price inquiry
-    if (lower.includes('price') || lower.includes('cost') || lower.includes('how much')) {
-        const matchedProduct = products.find(p =>
-            lower.includes(p.name.toLowerCase()) ||
-            lower.includes(p.category.toLowerCase())
-        );
-        if (matchedProduct) {
-            return `**${matchedProduct.name}** is priced at ৳${matchedProduct.price.toLocaleString()}. Would you like to order? 😊`;
-        }
-        return "Which product's price would you like to know?";
-    }
-
-    // Bengali buy intent
-    if (message.includes('কিনতে') || message.includes('অর্ডার') || message.includes('নিতে চাই')) {
-        return "দারুণ! 🛒 অর্ডার করতে আপনার নাম, ফোন নম্বর এবং ঠিকানা দিন। আমি সাহায্য করব!";
-    }
-
-    // English buy intent
-    if (lower.includes('buy') || lower.includes('order') || lower.includes('purchase')) {
-        return "Great! 🛒 To order, please share your name, phone number, and delivery address!";
-    }
-
-    // Bengali thanks
-    if (message.includes('ধন্যবাদ') || message.includes('থ্যাংকস')) {
-        return "স্বাগতম! 😊 আর কিছু সাহায্য লাগলে বলবেন!";
-    }
-
-    // English thanks
-    if (lower.includes('thank')) {
-        return "You're welcome! 😊 Let me know if you need anything else!";
-    }
-
-    // Default - detect language
-    if (isBengali) {
-        return "আমি সাহায্য করতে এখানে আছি! 😊\n\n• প্রোডাক্ট দেখতে বলুন\n• দাম জানতে জিজ্ঞেস করুন\n• অর্ডার করতে বলুন\n\nকী জানতে চান?";
-    }
-
-    return "I'm here to help! 😊\n\n• Ask about our products\n• Check prices & stock\n• Place an order\n• Get discounts\n\nWhat would you like to know?";
+    return null;
 }
