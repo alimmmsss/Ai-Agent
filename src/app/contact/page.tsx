@@ -34,17 +34,20 @@ export default function ContactPage() {
             timestamp: new Date().toISOString()
         };
 
-        setMessages(prev => [...prev, userMessage]);
+        // Add user message to UI immediately
+        const updatedMessages = [...messages, userMessage];
+        setMessages(updatedMessages);
         setInput('');
         setIsLoading(true);
 
         try {
+            // IMPORTANT: Send the COMPLETE history including the new user message
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: userMessage.content,
-                    conversationHistory: messages
+                    conversationHistory: updatedMessages // Send complete history with current message
                 })
             });
 

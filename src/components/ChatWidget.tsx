@@ -43,17 +43,20 @@ export default function ChatWidget() {
             timestamp: new Date().toISOString()
         };
 
-        setMessages(prev => [...prev, userMessage]);
+        // Add user message to UI immediately and create updated history
+        const updatedMessages = [...messages, userMessage];
+        setMessages(updatedMessages);
         setInput('');
         setIsLoading(true);
 
         try {
+            // IMPORTANT: Send COMPLETE history including the new user message
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: userMessage.content,
-                    conversationHistory: messages
+                    conversationHistory: updatedMessages // Complete history with current message
                 })
             });
 
