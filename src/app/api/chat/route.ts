@@ -18,6 +18,70 @@ interface Product {
     category: string;
 }
 
+// Conversation state detection
+type ConversationState = 'GREETING' | 'BROWSING' | 'PRODUCT_DISCUSSION' | 'COLLECTING_ORDER' | 'ORDER_CONFIRMED';
+
+function detectConversationState(history: ChatMessage[], products: Product[]): {
+    state: ConversationState;
+    activeProduct: Product | null;
+    collectedInfo: { name?: string; phone?: string; address?: string };
+} {
+    const collectedInfo: { name?: string; phone?: string; address?: string } = {};
+    let activeProduct: Product | null = null;
+    let state: ConversationState = 'GREETING';
+
+    // Analyze conversation from start to end
+    for (let i = 0; i < history.length; i++) {
+        const msg = history[i];
+        const content = msg.content.toLowerCase();
+
+        // Find active product mentioned
+        for (const product of products) {
+            if (content.includes(product.name.toLowerCase())) {
+                activeProduct = product;
+                state = 'PRODUCT_DISCUSSION';
+            }
+        }
+
+        // Check if we're in order collection mode
+        if (msg.role === 'assistant') {
+            if (content.includes('your name') || content.includes('নামটা বলুন') ||
+                content.includes('what\'s your name') || content.includes('আপনার নাম')) {
+                state = 'COLLECTING_ORDER';
+            }
+            if (content.includes('phone number') || content.includes('ফোন নম্বর')) {
+                state = 'COLLECTING_ORDER';
+            }
+            if (content.includes('delivery address') || content.includes('ঠিকানা') || content.includes('address')) {
+                state = 'COLLECTING_ORDER';
+            }
+            if (content.includes('order confirmed') || content.includes('অর্ডার কনফার্ম')) {
+                state = 'ORDER_CONFIRMED';
+            }
+        }
+
+        // Extract order info from user messages in COLLECTING_ORDER state
+        if (msg.role === 'user' && state === 'COLLECTING_ORDER') {
+            // Look for phone numbers (Bangladesh format)
+            const phoneMatch = msg.content.match(/01[3-9]\d{8}/);
+            if (phoneMatch) {
+                collectedInfo.phone = phoneMatch[0];
+            }
+
+            // Simple name/address detection (if not a phone number and has text)
+            if (!phoneMatch && msg.content.length > 2) {
+                if (!collectedInfo.name) {
+                    collectedInfo.name = msg.content.trim();
+                } else if (!collectedInfo.address) {
+                    collectedInfo.address = msg.content.trim();
+                }
+            }
+        }
+    }
+
+    return { state, activeProduct, collectedInfo };
+}
+
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
@@ -37,10 +101,15 @@ export async function POST(request: NextRequest) {
             console.error('Error fetching products:', error);
         }
 
-        // If no API key, use fallback
+        // Detect current conversation state
+        const { state, activeProduct, collectedInfo } = detectConversationState(conversationHistory, productList);
+
+        console.log('Conversation State:', { state, activeProduct: activeProduct?.name, collectedInfo });
+
+        // If no API key, use smart fallback
         if (!apiKey) {
             return NextResponse.json({
-                message: getFallbackResponse(message, productList, conversationHistory),
+                message: getSmartFallbackResponse(message, productList, conversationHistory, state, activeProduct, collectedInfo),
                 messageId: uuidv4()
             });
         }
@@ -48,19 +117,25 @@ export async function POST(request: NextRequest) {
         // Format product catalog for the AI
         const productCatalog = productList.map(p =>
             `📦 ${p.name} (ID: ${p.id})
-   💰 Price: ৳${p.price.toLocaleString()}
+   💰 Price: ৳${p.price.toLocaleString()} (10% off: ৳${Math.round(p.price * 0.9).toLocaleString()})
    📊 Stock: ${p.stock > 0 ? `${p.stock} available` : 'Out of stock'}
    🏷️ Category: ${p.category}
    📝 ${p.description}`
         ).join('\n\n');
 
-        // SENIOR SALES CLOSER SYSTEM PROMPT WITH INTERNAL CHECKLIST
+        // Build context summary for the AI
+        const contextSummary = `
+### CURRENT CONVERSATION STATE: ${state}
+${activeProduct ? `### ACTIVE PRODUCT: ${activeProduct.name} (৳${activeProduct.price.toLocaleString()}, 10% off = ৳${Math.round(activeProduct.price * 0.9).toLocaleString()})` : ''}
+${Object.keys(collectedInfo).length > 0 ? `### COLLECTED ORDER INFO: ${JSON.stringify(collectedInfo)}` : ''}
+`;
+
+        // SENIOR SALES CLOSER SYSTEM PROMPT
         const systemPrompt = `### ROLE
-You are the "Senior Sales Closer" for AI Store (Bangladesh). You are NOT a support bot. Your mission is to convert every chat into a sale using proactive logic and contextual memory.
+You are the "Senior Sales Closer" for AI Store (Bangladesh). Your mission is to convert chats into sales.
 
 ### LANGUAGE RULES
 - MATCH the customer's language: Bengali → Bengali, English → English
-- Bengali: হাই/হ্যালো = Hello | ধন্যবাদ = Thanks | হ্যাঁ = Yes | প্রোডাক্ট = Product | দাম = Price | কিনতে চাই = Want to buy
 
 ### YOUR PRODUCT CATALOG:
 ${productCatalog || 'No products available.'}
@@ -72,70 +147,45 @@ ${productCatalog || 'No products available.'}
 
 ---
 
-## RULE 1: CONTEXTUAL CONTINUITY (NO AMNESIA)
-- Read the ENTIRE history (last 10+ messages).
-- Identify the "Active Product" - the last product mentioned by either party.
-- **CRITICAL**: If user asks "How much?", "Discount?", "Price?", or "How to proceed?" → Automatically apply to the Active Product.
-- **NEVER** ask "Which product?" if a product was mentioned in previous messages.
-- Track this in your mind: "User mentioned [Product X] 2 messages ago → Active Product = Product X"
-
-## RULE 2: SALES & CLOSING
-- When ANY price is mentioned, IMMEDIATELY offer the 10% "Today Only" discount.
-- Calculate discounted price: Original × 0.9
-- **EVERY response MUST end with a Closing Question:**
-  - "What color do you prefer?"
-  - "Should I reserve this for you?"
-  - "Can I have your delivery address?"
-  - "Ready to order? I just need your name and phone."
-
-## RULE 3: THE INTERNAL FINAL CHECKLIST (RUN THIS BEFORE EVERY RESPONSE)
-Before outputting ANY response, mentally verify:
-
-✅ **1. HISTORY CHECK**: Did I analyze previous messages to find the Active Product?
-✅ **2. REPETITION CHECK**: Am I giving a generic "How can I help you" menu? (If YES → STOP → Answer the specific question instead)
-✅ **3. PRODUCT IDENTIFICATION**: Do I know which product the user means? (If YES → Use its name in reply)
-✅ **4. CLOSING CHECK**: Does my response end with a question that moves toward purchase?
-
-If any check fails, FIX IT before responding.
+${contextSummary}
 
 ---
 
-### EXAMPLE CONVERSATIONS:
+## CRITICAL RULES:
 
-**Scenario 1: User asks about discount after product mention**
-User: "Tell me about the headphones"
-You: "[Product details + price + 10% offer]"
-User: "What's the discount?"
-You: "For the **Premium Wireless Headphones**, the 10% Today-Only discount brings it to ৳4,499 (from ৳4,999)! 🎧 Should I lock this price for you?"
-❌ WRONG: "Which product would you like a discount on?"
+### IF STATE IS "COLLECTING_ORDER":
+- The user is providing their order details (name, phone, address)
+- Parse what they provided and ask for the NEXT missing piece
+- DO NOT ask "which product" - we already know it's ${activeProduct?.name || 'the product they selected'}
+- If they give name → ask for phone
+- If they give phone → ask for address  
+- If they give address → CONFIRM THE ORDER with summary
 
-**Scenario 2: User says "Yes" after product discussion**
-You: "[Described Smart Watch Pro with 10% offer]"
-User: "Yes"
-You: "Excellent! 🎉 The Smart Watch Pro is yours at ৳8,099! To complete the order, I need your name and phone number. What's your name?"
-❌ WRONG: "I'm here to help! What would you like to know?"
+### IF STATE IS "PRODUCT_DISCUSSION":
+- Active product is: ${activeProduct?.name || 'unknown'}
+- If user says "Yes", "OK", "Sure" → Start collecting order (ask for name)
+- If user asks about price/discount → Give price with 10% discount
 
-**Scenario 3: Context from earlier**
-[3 messages ago: User asked about Smart Watch]
-User: "How much is it?"
-You: "The **Smart Watch Pro** is ৳8,999 - but with our 10% Today-Only discount, it's just ৳8,099! Want me to reserve one for you?"
-❌ WRONG: "Which product's price would you like to know?"
+### ORDER CONFIRMATION FORMAT:
+When you have name, phone, address - confirm like this:
+"✅ অর্ডার কনফার্ম!
 
-**Scenario 4: Bengali conversation**
-User: "হাই"
-You: "হ্যালো! 👋 AI Store এ স্বাগতম! আমাদের বেস্টসেলার Smart Watch Pro এখন ১০% ছাড়ে ৳৮,০৯৯! দেখবেন নাকি?"
+📦 Product: [Name]
+💰 Price: ৳[discounted price]
+👤 Name: [name]
+📱 Phone: [phone]
+📍 Address: [address]
 
-User: "দাম কত?" (after smart watch mention)
-You: "**Smart Watch Pro** এর দাম ৳৮,৯৯৯ - আজকের ১০% ছাড়ে মাত্র ৳৮,০৯৯! 💰 অর্ডার করবেন?"
+আপনার অর্ডার ২-৩ দিনের মধ্যে পৌঁছে যাবে! ধন্যবাদ! 🎉"
 
----
+### ABSOLUTELY NEVER:
+- Ask "which product?" if we're in COLLECTING_ORDER state
+- Give generic menu if conversation has context
+- Forget the active product
 
-### GUARDRAILS
-- NO "Robot Talk": Never say "As an AI..." or "Here's what I can do..."
-- NO Generic Menus: If conversation has a product context, don't show menu
-- If context is 100% truly lost: "Which product were you interested in? I want to give you the right discount!"
-- ALWAYS end with a closing question`;
-
+### ALWAYS:
+- End with a question that moves toward completing the order
+- Use the active product name in your responses`;
 
         // Initialize Google AI
         const genAI = new GoogleGenerativeAI(apiKey);
@@ -144,25 +194,23 @@ You: "**Smart Watch Pro** এর দাম ৳৮,৯৯৯ - আজকের �
             systemInstruction: systemPrompt,
         });
 
-        // Build conversation history - include ALL messages for context
+        // Build conversation history
         const history = conversationHistory
             .filter((msg: ChatMessage) => msg.role === 'user' || msg.role === 'assistant')
-            .slice(-20) // Keep last 20 messages for full context
+            .slice(-20)
             .map((msg: ChatMessage) => ({
                 role: msg.role === 'assistant' ? 'model' : 'user',
                 parts: [{ text: msg.content }]
             }));
 
-        // Start chat with history
         const chat = model.startChat({
             history: history as any,
             generationConfig: {
                 maxOutputTokens: 1024,
-                temperature: 0.8,
+                temperature: 0.7,
             },
         });
 
-        // Send message and get response
         const result = await chat.sendMessage(message);
         const assistantMessage = result.response.text();
 
@@ -180,84 +228,132 @@ You: "**Smart Watch Pro** এর দাম ৳৮,৯৯৯ - আজকের �
     }
 }
 
-// Smart fallback responses
-function getFallbackResponse(message: string, products: Product[], history: ChatMessage[]): string {
-    const lower = message.toLowerCase();
+// Smart fallback with state awareness
+function getSmartFallbackResponse(
+    message: string,
+    products: Product[],
+    history: ChatMessage[],
+    state: ConversationState,
+    activeProduct: Product | null,
+    collectedInfo: { name?: string; phone?: string; address?: string }
+): string {
     const isBengali = /[\u0980-\u09FF]/.test(message);
+    const lower = message.toLowerCase();
 
-    // Find last mentioned product from history
-    const lastProductMention = findLastProduct(history, products);
+    // Extract info from current message
+    const phoneMatch = message.match(/01[3-9]\d{8}/);
+    const hasPhone = phoneMatch !== null;
 
-    // Handle discount/price queries with context
-    if (lower.includes('discount') || lower.includes('price') || message.includes('দাম') || message.includes('ছাড়')) {
-        if (lastProductMention) {
-            const discountedPrice = Math.round(lastProductMention.price * 0.9);
+    // STATE: COLLECTING_ORDER - User is providing order details
+    if (state === 'COLLECTING_ORDER' && activeProduct) {
+        const discountedPrice = Math.round(activeProduct.price * 0.9);
+
+        // Parse the message for order info
+        let name = collectedInfo.name;
+        let phone = collectedInfo.phone || (hasPhone ? phoneMatch![0] : undefined);
+        let address = collectedInfo.address;
+
+        // If message contains multiple pieces of info (like "Alim...01921052355.....katiadi")
+        const parts = message.split(/[,.\s]+/).filter(p => p.length > 1);
+        for (const part of parts) {
+            const partPhone = part.match(/01[3-9]\d{8}/);
+            if (partPhone) {
+                phone = partPhone[0];
+            } else if (!name && part.length > 2 && !/^\d+$/.test(part)) {
+                name = part;
+            } else if (name && !address && part.length > 2 && !/^\d+$/.test(part)) {
+                address = part;
+            }
+        }
+
+        // If we got all info, confirm order
+        if (name && phone && address) {
             return isBengali
-                ? `**${lastProductMention.name}** এ আজ ১০% ছাড়! 🎉\n\nআসল দাম: ৳${lastProductMention.price.toLocaleString()}\nআপনার দাম: **৳${discountedPrice.toLocaleString()}**\n\nঅর্ডার করবেন?`
-                : `Great news! I can offer 10% off on **${lastProductMention.name}**! 🎉\n\nOriginal: ৳${lastProductMention.price.toLocaleString()}\nYour price: **৳${discountedPrice.toLocaleString()}**\n\nShould I lock this price for you?`;
+                ? `✅ **অর্ডার কনফার্ম!** 🎉\n\n📦 **প্রোডাক্ট:** ${activeProduct.name}\n💰 **মূল্য:** ৳${discountedPrice.toLocaleString()} (১০% ছাড়)\n👤 **নাম:** ${name}\n📱 **ফোন:** ${phone}\n📍 **ঠিকানা:** ${address}\n\n🚚 আপনার অর্ডার ২-৩ দিনের মধ্যে পৌঁছে যাবে!\nধন্যবাদ AI Store থেকে শপিং করার জন্য! 💜`
+                : `✅ **Order Confirmed!** 🎉\n\n📦 **Product:** ${activeProduct.name}\n💰 **Price:** ৳${discountedPrice.toLocaleString()} (10% off)\n👤 **Name:** ${name}\n📱 **Phone:** ${phone}\n📍 **Address:** ${address}\n\n🚚 Your order will arrive in 2-3 days!\nThank you for shopping with AI Store! 💜`;
+        }
+
+        // Ask for missing info
+        if (!name) {
+            return isBengali
+                ? `${activeProduct.name} এর জন্য অর্ডার নিচ্ছি! 🎉\n\nদয়া করে আপনার **নাম** বলুন?`
+                : `Processing your order for ${activeProduct.name}! 🎉\n\nWhat's your **name**?`;
+        }
+        if (!phone) {
+            return isBengali
+                ? `ধন্যবাদ ${name}! 😊\n\nআপনার **ফোন নম্বর** দিন (যেমন: 01XXXXXXXXX)?`
+                : `Thanks ${name}! 😊\n\nWhat's your **phone number**?`;
+        }
+        if (!address) {
+            return isBengali
+                ? `চমৎকার! 📱\n\nএখন আপনার **ডেলিভারি ঠিকানা** দিন?`
+                : `Perfect! 📱\n\nNow, what's your **delivery address**?`;
         }
     }
 
-    // Handle "Yes" with context
-    if (lower === 'yes' || lower === 'ok' || lower === 'sure' || message === 'হ্যাঁ' || message === 'হাঁ') {
-        if (lastProductMention) {
-            return isBengali
-                ? `দারুণ! 🎉 ${lastProductMention.name} আপনার জন্য!\n\nঅর্ডার সম্পন্ন করতে বলুন:\n📝 আপনার নাম\n📱 ফোন নম্বর\n📍 ঠিকানা\n\nনামটা বলুন?`
-                : `Excellent choice! 🎉 The ${lastProductMention.name} is yours!\n\nTo complete your order, I need:\n📝 Your name\n📱 Phone number\n📍 Delivery address\n\nWhat's your name?`;
-        }
+    // STATE: PRODUCT_DISCUSSION - User said Yes/OK to a product
+    if ((lower === 'yes' || lower === 'ok' || lower === 'sure' || lower === 'হ্যাঁ') && activeProduct) {
+        const discountedPrice = Math.round(activeProduct.price * 0.9);
         return isBengali
-            ? `দারুণ! 😊 কোন প্রোডাক্টটি নিতে চাচ্ছেন?`
-            : `Great! 😊 Which product caught your eye?`;
+            ? `দারুণ পছন্দ! 🎉 **${activeProduct.name}** আপনার হবে মাত্র ৳${discountedPrice.toLocaleString()} তে!\n\nঅর্ডার সম্পন্ন করতে আপনার **নাম** বলুন?`
+            : `Excellent choice! 🎉 **${activeProduct.name}** is yours for just ৳${discountedPrice.toLocaleString()}!\n\nTo complete the order, what's your **name**?`;
     }
 
-    // Handle product name queries
+    // Handle discount/price queries
+    if (lower.includes('discount') || lower.includes('price') || lower.includes('দাম') || lower.includes('ছাড়')) {
+        if (activeProduct) {
+            const discountedPrice = Math.round(activeProduct.price * 0.9);
+            return isBengali
+                ? `**${activeProduct.name}** এ আজ ১০% ছাড়! 🎉\n\nআসল দাম: ৳${activeProduct.price.toLocaleString()}\nআপনার দাম: **৳${discountedPrice.toLocaleString()}**\n\nঅর্ডার করবেন?`
+                : `10% off on **${activeProduct.name}** today! 🎉\n\nOriginal: ৳${activeProduct.price.toLocaleString()}\nYour price: **৳${discountedPrice.toLocaleString()}**\n\nShould I reserve this for you?`;
+        }
+    }
+
+    // Handle product queries
     for (const product of products) {
         if (lower.includes(product.name.toLowerCase()) || lower.includes(product.category.toLowerCase())) {
             const discountedPrice = Math.round(product.price * 0.9);
-            return `The **${product.name}** is one of our bestsellers! 🔥\n\n💰 **Price:** ৳${product.price.toLocaleString()}\n✨ **${product.description}**\n📦 **Stock:** ${product.stock > 0 ? `${product.stock} available` : 'Out of stock'}\n\n🎁 Special offer: 10% off today = **৳${discountedPrice.toLocaleString()}**\n\nWant me to reserve one for you?`;
+            return `**${product.name}** - Our bestseller! 🔥\n\n💰 **Price:** ৳${product.price.toLocaleString()}\n🎁 **Today's Deal:** ৳${discountedPrice.toLocaleString()} (10% off!)\n✨ ${product.description}\n📦 Stock: ${product.stock > 0 ? 'Available' : 'Out of stock'}\n\nWant to grab this deal?`;
         }
     }
 
     // Bengali greeting
-    if (message.includes('হাই') || message.includes('হ্যালো')) {
-        const topProduct = products[0];
-        const discountedPrice = topProduct ? Math.round(topProduct.price * 0.9) : 0;
-        return `হ্যালো! 👋 AI Store এ স্বাগতম!\n\nআজ কী খুঁজছেন? আমাদের সবচেয়ে জনপ্রিয় প্রোডাক্ট হলো **${topProduct?.name}** (৳${topProduct?.price.toLocaleString()}) - এখন ১০% ছাড়ে ৳${discountedPrice.toLocaleString()}!\n\nদেখবেন নাকি?`;
+    if (lower.includes('হাই') || lower.includes('হ্যালো')) {
+        const top = products[0];
+        if (top) {
+            const discountedPrice = Math.round(top.price * 0.9);
+            return `হ্যালো! 👋 AI Store এ স্বাগতম!\n\nআমাদের বেস্টসেলার **${top.name}** এখন ১০% ছাড়ে মাত্র ৳${discountedPrice.toLocaleString()}!\n\nদেখবেন নাকি?`;
+        }
     }
 
-    // English greeting
+    // English greeting  
     if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
-        const topProduct = products[0];
-        const discountedPrice = topProduct ? Math.round(topProduct.price * 0.9) : 0;
-        return `Hey there! 👋 Welcome to AI Store!\n\nLooking for something specific? Our bestseller **${topProduct?.name}** is on sale - ৳${discountedPrice.toLocaleString()} (10% off)!\n\nWant to check it out?`;
+        const top = products[0];
+        if (top) {
+            const discountedPrice = Math.round(top.price * 0.9);
+            return `Hey! 👋 Welcome to AI Store!\n\nOur bestseller **${top.name}** is on sale - ৳${discountedPrice.toLocaleString()} (10% off)!\n\nWant to check it out?`;
+        }
     }
 
-    // Products inquiry
-    if (lower.includes('product') || lower.includes('show') || message.includes('প্রোডাক্ট')) {
+    // Products list
+    if (lower.includes('product') || lower.includes('show') || lower.includes('প্রোডাক্ট')) {
         const list = products.slice(0, 3).map(p =>
             `• **${p.name}** - ৳${p.price.toLocaleString()} ${p.stock > 0 ? '✅' : '❌'}`
         ).join('\n');
         return isBengali
-            ? `আমাদের সেরা প্রোডাক্ট:\n\n${list}\n\n🎁 সবগুলোতে আজ ১০% ছাড়! কোনটা সম্পর্কে জানতে চান?`
-            : `Here are our top products:\n\n${list}\n\n🎁 All have 10% off today! Which one interests you?`;
+            ? `আমাদের সেরা প্রোডাক্ট:\n\n${list}\n\n🎁 সবগুলোতে ১০% ছাড়! কোনটা দেখবেন?`
+            : `Our top products:\n\n${list}\n\n🎁 All have 10% off! Which one interests you?`;
     }
 
-    // Default - don't show generic menu, ask what they want
+    // Default with context
+    if (activeProduct) {
+        const discountedPrice = Math.round(activeProduct.price * 0.9);
+        return isBengali
+            ? `আপনি **${activeProduct.name}** সম্পর্কে জানতে চেয়েছিলেন। দাম ৳${discountedPrice.toLocaleString()} (১০% ছাড়!)। অর্ডার করবেন?`
+            : `You were asking about **${activeProduct.name}**. It's ৳${discountedPrice.toLocaleString()} (10% off!). Want to order?`;
+    }
+
     return isBengali
-        ? `কোন প্রোডাক্ট সম্পর্কে জানতে চান? আমি আপনাকে সেরা ডিল দিতে পারি! 😊`
-        : `Which product are you interested in? I'd love to get you the best deal! 😊`;
-}
-
-// Find the last mentioned product from conversation history
-function findLastProduct(history: ChatMessage[], products: Product[]): Product | null {
-    // Go through history in reverse to find last product mention
-    for (let i = history.length - 1; i >= 0; i--) {
-        const msg = history[i].content.toLowerCase();
-        for (const product of products) {
-            if (msg.includes(product.name.toLowerCase())) {
-                return product;
-            }
-        }
-    }
-    return null;
+        ? `কোন প্রোডাক্ট দেখতে চান? আমি সেরা ডিল দিতে পারি! 😊`
+        : `Which product would you like to see? I can get you the best deal! 😊`;
 }
