@@ -62,7 +62,7 @@ export default function DashboardSidebar() {
             `}>
                 <div className="mb-8">
                     <h1 className="text-xl font-bold text-white">Owner Dashboard</h1>
-                    <p className="text-slate-400 text-sm">AI Sales Agent</p>
+                    <p className="text-slate-400 text-sm">Gadgets Store</p>
                 </div>
 
                 <nav className="flex-1 space-y-2">

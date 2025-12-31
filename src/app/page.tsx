@@ -25,15 +25,15 @@ export default async function Home() {
       <section className="pt-24 md:pt-32 pb-12 md:pb-20 px-4 md:px-6">
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-block px-3 py-1.5 md:px-4 md:py-2 bg-indigo-500/20 rounded-full text-indigo-300 text-xs md:text-sm mb-4 md:mb-6">
-            🤖 Powered by AI Sales Agent
+            🛒 Your Trusted Gadgets Destination
           </div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 md:mb-6 leading-tight">
-            Shop Smarter with
-            <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent"> AI Assistance</span>
+            Discover Premium
+            <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent"> Gadgets</span>
           </h2>
           <p className="text-base md:text-xl text-gray-400 mb-8 md:mb-10 max-w-2xl mx-auto px-2">
-            Our AI sales assistant is ready to help you find the perfect products,
-            answer questions, and even negotiate the best deals for you.
+            Our support team is ready to help you find the perfect products,
+            answer your questions, and ensure you get the best shopping experience.
           </p>
           <Link
             href="/contact"
@@ -85,8 +85,8 @@ export default async function Home() {
       <section className="py-12 md:py-20 px-4 md:px-6 bg-[#1f2937]">
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
           {[
-            { icon: '💬', title: 'AI-Powered Chat', desc: 'Get instant answers to all your product questions' },
-            { icon: '💰', title: 'Smart Deals', desc: 'Our AI can negotiate special discounts just for you' },
+            { icon: '💬', title: 'Live Chat Support', desc: 'Get instant answers to all your product questions' },
+            { icon: '💰', title: 'Best Deals', desc: 'We offer special discounts and exclusive offers just for you' },
             { icon: '🚚', title: 'Fast Delivery', desc: 'Quick processing and reliable shipping options' }
           ].map((feature, i) => (
             <div key={i} className="text-center">
@@ -106,10 +106,10 @@ export default async function Home() {
             {/* Company Info */}
             <div className="lg:col-span-1">
               <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                AI Store
+                Gadgets Store
               </Link>
               <p className="mt-4 text-gray-400 text-sm leading-relaxed">
-                Your smart shopping destination powered by cutting-edge AI technology. Get personalized recommendations and the best deals.
+                Your trusted destination for premium gadgets and electronics. Get personalized support and the best deals.
               </p>
               {/* Social Links */}
               <div className="flex gap-4 mt-6">
@@ -158,7 +158,7 @@ export default async function Home() {
               {/* Contact Info */}
               <div className="mt-6 space-y-2">
                 <p className="text-gray-400 text-sm flex items-center gap-2">
-                  <span>📧</span> support@aistore.com
+                  <span>📧</span> support@gadgetsstore.com
                 </p>
                 <p className="text-gray-400 text-sm flex items-center gap-2">
                   <span>📞</span> +880 1234-567890
@@ -173,7 +173,7 @@ export default async function Home() {
           <div className="max-w-7xl mx-auto px-6 py-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <p className="text-gray-500 text-sm">
-                © {new Date().getFullYear()} AI Store. All rights reserved.
+                © {new Date().getFullYear()} Gadgets Store. All rights reserved.
               </p>
               <div className="flex gap-6">
                 <a href="#" className="text-gray-500 hover:text-gray-400 text-sm transition-colors">Privacy Policy</a>
