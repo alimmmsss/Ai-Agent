@@ -12,7 +12,8 @@ import {
     ArrowLeft,
     Mail,
     Menu,
-    X
+    X,
+    MessageCircle
 } from 'lucide-react';
 
 export default function DashboardSidebar() {
@@ -25,6 +26,7 @@ export default function DashboardSidebar() {
         { href: '/dashboard/orders', icon: ShoppingCart, label: 'Orders' },
         { href: '/dashboard/products', icon: Package, label: 'Products' },
         { href: '/dashboard/subscribers', icon: Mail, label: 'Subscribers' },
+        { href: '/dashboard/messages', icon: MessageCircle, label: 'Messages' },
         { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
     ];
 

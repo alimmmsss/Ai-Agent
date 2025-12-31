@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp, json, decimal } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, boolean, timestamp, json } from 'drizzle-orm/pg-core';
 
 // Products table
 export const products = pgTable('products', {
@@ -88,6 +88,29 @@ export const chatSessions = pgTable('chat_sessions', {
     updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// Customer Conversations table - tracks each customer chat session
+export const conversations = pgTable('conversations', {
+    id: text('id').primaryKey(),
+    sessionId: text('session_id').notNull(),     // Browser session identifier
+    customerName: text('customer_name'),          // Optional customer name
+    customerEmail: text('customer_email'),        // Optional email
+    status: text('status').notNull().default('open'), // open, closed
+    unreadCount: integer('unread_count').notNull().default(0), // Unread by admin
+    lastMessageAt: timestamp('last_message_at').defaultNow(),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Chat Messages table - individual messages in a conversation
+export const chatMessages = pgTable('chat_messages', {
+    id: text('id').primaryKey(),
+    conversationId: text('conversation_id').notNull()
+        .references(() => conversations.id, { onDelete: 'cascade' }),
+    role: text('role').notNull(), // 'customer' or 'owner'
+    content: text('content').notNull(),
+    isRead: boolean('is_read').notNull().default(false),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
 // Types for Drizzle
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
@@ -101,4 +124,7 @@ export type Subscriber = typeof subscribers.$inferSelect;
 export type NewSubscriber = typeof subscribers.$inferInsert;
 export type ChatSession = typeof chatSessions.$inferSelect;
 export type NewChatSession = typeof chatSessions.$inferInsert;
-
+export type Conversation = typeof conversations.$inferSelect;
+export type NewConversation = typeof conversations.$inferInsert;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type NewChatMessage = typeof chatMessages.$inferInsert;
