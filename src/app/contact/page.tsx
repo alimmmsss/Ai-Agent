@@ -1,74 +1,119 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import CustomerNav from '@/components/CustomerNav';
 import { MessageCircle, Send, Loader2, Phone, Mail, MapPin, Clock } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface Message {
     id: string;
-    role: 'user' | 'assistant';
+    role: 'customer' | 'owner';
     content: string;
-    timestamp: string;
+    createdAt: string;
 }
 
 export default function ContactPage() {
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: '1',
-            role: 'assistant',
-            content: "Hello! 👋 Welcome to our store! I'm your AI sales assistant. How can I help you today? Feel free to ask about our products, prices, or anything else!",
-            timestamp: new Date().toISOString()
-        }
-    ]);
+    const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [sessionId, setSessionId] = useState<string>('');
+    const [isWaiting, setIsWaiting] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    const sendMessage = async () => {
-        if (!input.trim() || isLoading) return;
+    // Initialize session ID from localStorage
+    useEffect(() => {
+        let storedSessionId = localStorage.getItem('chatSessionId');
+        if (!storedSessionId) {
+            storedSessionId = uuidv4();
+            localStorage.setItem('chatSessionId', storedSessionId);
+        }
+        setSessionId(storedSessionId);
+    }, []);
 
-        const userMessage: Message = {
-            id: uuidv4(),
-            role: 'user',
-            content: input.trim(),
-            timestamp: new Date().toISOString()
-        };
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
 
-        // Add user message to UI immediately
-        const updatedMessages = [...messages, userMessage];
-        setMessages(updatedMessages);
-        setInput('');
-        setIsLoading(true);
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+    // Fetch existing messages
+    const fetchMessages = useCallback(async () => {
+        if (!sessionId) return;
 
         try {
-            // IMPORTANT: Send the COMPLETE history including the new user message
-            const response = await fetch('/api/chat', {
+            const response = await fetch(`/api/chat/send?sessionId=${sessionId}`);
+            const data = await response.json();
+
+            if (data.messages && data.messages.length > 0) {
+                setMessages(data.messages);
+
+                // Check if waiting for owner response
+                const lastMessage = data.messages[data.messages.length - 1];
+                setIsWaiting(lastMessage.role === 'customer');
+            }
+        } catch (error) {
+            console.error('Error fetching messages:', error);
+        }
+    }, [sessionId]);
+
+    // Initial fetch and polling setup
+    useEffect(() => {
+        if (sessionId) {
+            fetchMessages();
+
+            // Poll for new messages every 5 seconds
+            pollIntervalRef.current = setInterval(fetchMessages, 5000);
+        }
+
+        return () => {
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+            }
+        };
+    }, [sessionId, fetchMessages]);
+
+    const sendMessage = async () => {
+        if (!input.trim() || isLoading || !sessionId) return;
+
+        const messageContent = input.trim();
+
+        // Optimistically add message to UI
+        const tempMessage: Message = {
+            id: uuidv4(),
+            role: 'customer',
+            content: messageContent,
+            createdAt: new Date().toISOString(),
+        };
+
+        setMessages(prev => [...prev, tempMessage]);
+        setInput('');
+        setIsLoading(true);
+        setIsWaiting(true);
+
+        try {
+            const response = await fetch('/api/chat/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: userMessage.content,
-                    conversationHistory: updatedMessages // Send complete history with current message
-                })
+                    sessionId,
+                    message: messageContent,
+                }),
             });
 
             const data = await response.json();
 
-            const assistantMessage: Message = {
-                id: uuidv4(),
-                role: 'assistant',
-                content: data.message || "I'm sorry, I couldn't process that. Could you try again?",
-                timestamp: new Date().toISOString()
-            };
+            if (!data.success) {
+                throw new Error('Failed to send message');
+            }
 
-            setMessages(prev => [...prev, assistantMessage]);
         } catch (error) {
-            console.error('Error:', error);
-            setMessages(prev => [...prev, {
-                id: uuidv4(),
-                role: 'assistant',
-                content: "I'm having trouble connecting. Please try again in a moment.",
-                timestamp: new Date().toISOString()
-            }]);
+            console.error('Error sending message:', error);
+            // Remove optimistic message on error
+            setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
+            setIsWaiting(false);
         } finally {
             setIsLoading(false);
         }
@@ -92,7 +137,7 @@ export default function ContactPage() {
                             Contact Us
                         </h1>
                         <p className="text-base md:text-xl text-gray-400 max-w-2xl mx-auto px-2">
-                            Chat with our AI assistant for instant help, or use the contact information below.
+                            Chat with our support team for instant help, or use the contact information below.
                         </p>
                     </div>
 
@@ -104,28 +149,53 @@ export default function ContactPage() {
                                     <MessageCircle size={18} className="text-white" />
                                 </div>
                                 <div className="min-w-0">
-                                    <h3 className="text-white font-semibold text-sm md:text-base">AI Sales Assistant</h3>
-                                    <p className="text-white/70 text-xs md:text-sm">Online • Ready to help</p>
+                                    <h3 className="text-white font-semibold text-sm md:text-base">Customer Support</h3>
+                                    <p className="text-white/70 text-xs md:text-sm">We typically reply within minutes</p>
                                 </div>
                             </div>
 
                             {/* Messages */}
                             <div className="h-[300px] sm:h-[350px] md:h-[400px] overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
+                                {/* Welcome message if no messages */}
+                                {messages.length === 0 && (
+                                    <div className="flex justify-start">
+                                        <div className="max-w-[85%] sm:max-w-[80%] p-3 md:p-4 rounded-xl md:rounded-2xl bg-[#374151] text-white rounded-bl-md">
+                                            <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">
+                                                Hello! 👋 How can we help you today? Send us a message and our team will respond as soon as possible.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {messages.map((msg) => (
                                     <div
                                         key={msg.id}
-                                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                        className={`flex ${msg.role === 'customer' ? 'justify-end' : 'justify-start'}`}
                                     >
                                         <div
-                                            className={`max-w-[85%] sm:max-w-[80%] p-3 md:p-4 rounded-xl md:rounded-2xl ${msg.role === 'user'
+                                            className={`max-w-[85%] sm:max-w-[80%] p-3 md:p-4 rounded-xl md:rounded-2xl ${msg.role === 'customer'
                                                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-md'
                                                 : 'bg-[#374151] text-white rounded-bl-md'
                                                 }`}
                                         >
                                             <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                                            <p className={`text-xs mt-1 ${msg.role === 'customer' ? 'text-white/60' : 'text-gray-400'}`}>
+                                                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
                                         </div>
                                     </div>
                                 ))}
+
+                                {/* Waiting indicator */}
+                                {isWaiting && !isLoading && (
+                                    <div className="flex justify-start">
+                                        <div className="bg-[#374151] p-3 md:p-4 rounded-xl md:rounded-2xl rounded-bl-md flex items-center gap-2 text-gray-400">
+                                            <Clock size={16} className="animate-pulse" />
+                                            <span className="text-xs sm:text-sm">Waiting for reply...</span>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {isLoading && (
                                     <div className="flex justify-start">
                                         <div className="bg-[#374151] p-3 md:p-4 rounded-xl md:rounded-2xl rounded-bl-md">
@@ -133,6 +203,7 @@ export default function ContactPage() {
                                         </div>
                                     </div>
                                 )}
+                                <div ref={messagesEndRef} />
                             </div>
 
                             {/* Input */}
@@ -178,7 +249,7 @@ export default function ContactPage() {
                                         </div>
                                         <div>
                                             <p className="text-sm text-gray-500">Email</p>
-                                            <p className="text-white">contact@aistore.com</p>
+                                            <p className="text-white">contact@gadgetsstore.com</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3 text-gray-400">
@@ -200,8 +271,8 @@ export default function ContactPage() {
                                         <Clock size={18} className="text-green-400" />
                                     </div>
                                     <div>
-                                        <p className="text-white">AI Support: 24/7</p>
-                                        <p className="text-sm text-gray-500">Human Support: 9AM - 9PM</p>
+                                        <p className="text-white">Live Chat: 9AM - 9PM</p>
+                                        <p className="text-sm text-gray-500">We respond within minutes</p>
                                     </div>
                                 </div>
                             </div>
